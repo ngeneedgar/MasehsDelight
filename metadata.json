@@ -1,0 +1,6 @@
+{
+  "name": "Maseh's Delight",
+  "description": "A poppy, modern, colorful African pastry & custom cake shop in the USA. A Taste of Home Away From Home.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

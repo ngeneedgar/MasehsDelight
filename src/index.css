@@ -1,0 +1,198 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-sans: 'DM Sans', 'Inter', sans-serif;
+  --font-accent: 'Plus Jakarta Sans', sans-serif;
+
+  --color-honey: #D99B26;
+  --color-honey-dark: #C0851B;
+  --color-honey-light: #FBF2DE;
+
+  --color-terracotta: #C85A32;
+  --color-terracotta-dark: #AF4924;
+  --color-terracotta-light: #F9EBE6;
+
+  --color-cocoa: #231712;
+  --color-cocoa-light: #3A2820;
+
+  --color-linen: #FAF6EE;
+  --color-linen-alt: #F3ECE0;
+
+  --color-body: #4A3E39;
+  --color-muted: #7A6C65;
+}
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background-color: #FAF6EE;
+  background-image: radial-gradient(circle at 10% 15%, rgba(217, 155, 38, 0.03) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(200, 90, 50, 0.03) 0%, transparent 40%);
+  color: #231712;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, .font-serif {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+h4, h5, h6, .font-sans {
+  font-family: 'DM Sans', sans-serif;
+}
+
+.font-accent {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* Subtle West African geometric textile pattern */
+.bg-african-textile {
+  background-image: url("data:image/svg+xml,%3Csvg width='48' height='48' viewBox='0 0 48 48' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23C85A32' fill-opacity='0.045' fill-rule='evenodd'%3E%3Cpath d='M24 0l12 12-12 12L12 12zm0 24l12 12-12 12-12-12zm-12-12L0 24l12 12 12-12zm24 0l-12 12 12 12 12-12z'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Tactile artisan card with warm ambient shadow */
+.artisan-card {
+  background-color: #FFFFFF;
+  border-radius: 1rem;
+  border: 1px solid rgba(35, 23, 18, 0.07);
+  box-shadow: 0 10px 30px -10px rgba(35, 23, 18, 0.06), 0 2px 8px -1px rgba(35, 23, 18, 0.03);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+  will-change: transform, box-shadow;
+}
+.artisan-card:hover {
+  transform: translateY(-6px) scale(1.015);
+  box-shadow: 0 20px 40px -12px rgba(200, 90, 50, 0.12), 0 6px 16px -2px rgba(35, 23, 18, 0.05);
+  border-color: rgba(217, 155, 38, 0.28);
+}
+
+/* Interactive primary button with sliding terracotta gradient & arrow nudge */
+.btn-primary {
+  background: linear-gradient(90deg, #D99B26 0%, #D99B26 48%, #C85A32 100%);
+  background-size: 210% 100%;
+  background-position: left center;
+  color: #FFFFFF;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  transition: background-position 0.4s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 14px rgba(217, 155, 38, 0.28);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  will-change: transform, background-position;
+}
+.btn-primary:hover {
+  background-position: right center;
+  box-shadow: 0 6px 18px rgba(200, 90, 50, 0.35);
+  transform: translateY(-1px);
+}
+.btn-primary:hover .btn-arrow {
+  transform: translateX(4px);
+}
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+/* Secondary Button */
+.btn-secondary {
+  background-color: transparent;
+  color: #231712;
+  border: 1.5px solid rgba(35, 23, 18, 0.18);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+.btn-secondary:hover {
+  border-color: #C85A32;
+  color: #C85A32;
+  background-color: rgba(200, 90, 50, 0.04);
+  transform: translateY(-1px);
+}
+.btn-secondary:active {
+  transform: translateY(0);
+}
+
+/* Sine-wave floating animation for badge */
+@keyframes floatSine {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-float-sine {
+  animation: floatSine 4s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* Slow continuous rotation for circular stamp */
+@keyframes spinSlow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spinSlow 24s linear infinite;
+  will-change: transform;
+}
+
+/* Heart burst spark animation */
+@keyframes heartSpark {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) translate(0, 0);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1) translate(var(--tx), var(--ty));
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #FAF6EE;
+}
+::-webkit-scrollbar-thumb {
+  background: #D99B26;
+  border-radius: 9999px;
+  border: 2px solid #FAF6EE;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #C85A32;
+}
+
+/* Accessibility: respect user preference for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float-sine,
+  .animate-spin-slow,
+  .artisan-card,
+  .btn-primary {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}

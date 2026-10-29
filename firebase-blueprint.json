@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Bakery pastry or celebration cake item available on the menu",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 150 },
+        "category": { "type": "string", "maxLength": 50 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "imageUrl": { "type": "string", "maxLength": 1000 },
+        "badge": { "type": "string", "maxLength": 50 },
+        "active": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "category", "description", "imageUrl", "active"]
+    },
+    "BlogPost": {
+      "title": "BlogPost",
+      "description": "Artisan journal article, recipe history, or catering story",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "excerpt": { "type": "string", "maxLength": 500 },
+        "category": { "type": "string", "maxLength": 50 },
+        "readTime": { "type": "string", "maxLength": 50 },
+        "publishedDate": { "type": "string", "maxLength": 50 },
+        "featuredImage": { "type": "string", "maxLength": 1000 },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "excerpt", "category", "featuredImage"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer pastry catering or retail order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "maxLength": 100 },
+        "customerPhone": { "type": "string", "maxLength": 50 },
+        "customerEmail": { "type": "string", "maxLength": 120 },
+        "eventDate": { "type": "string", "maxLength": 50 },
+        "orderType": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "maxLength": 50 },
+        "total": { "type": "number" },
+        "depositAmount": { "type": "number" },
+        "balanceDue": { "type": "number" }
+      },
+      "required": ["id", "customerName", "customerPhone", "eventDate", "status", "total"]
+    },
+    "BespokeInquiry": {
+      "title": "BespokeInquiry",
+      "description": "Custom celebration cake or banquet catering inquiry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "maxLength": 100 },
+        "customerPhone": { "type": "string", "maxLength": 50 },
+        "customerEmail": { "type": "string", "maxLength": 120 },
+        "requestedDate": { "type": "string", "maxLength": 50 },
+        "eventType": { "type": "string", "maxLength": 80 },
+        "guestCount": { "type": "number" },
+        "cakeTiers": { "type": "string", "maxLength": 100 },
+        "flavorSelection": { "type": "string", "maxLength": 150 },
+        "estimatedPrice": { "type": "number" },
+        "status": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "customerName", "customerPhone", "requestedDate", "eventType", "status"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Collection of bakery products, pastries, and custom cake options"
+    },
+    "/posts/{postId}": {
+      "schema": { "$ref": "#/entities/BlogPost" },
+      "description": "Collection of bakery stories, articles, and journal posts"
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Collection of customer orders and fulfillment tracking"
+    },
+    "/inquiries/{inquiryId}": {
+      "schema": { "$ref": "#/entities/BespokeInquiry" },
+      "description": "Collection of bespoke custom cake requests and quotes"
+    }
+  }
+}
