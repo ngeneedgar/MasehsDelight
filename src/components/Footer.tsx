@@ -219,9 +219,17 @@ export const Footer: React.FC = () => {
           <p>
             © {new Date().getFullYear()} Maseh's Delight Bakery. All rights reserved.
           </p>
-          <p>
-            Handcrafted in Maryland • Phone / WhatsApp: {MASEH_SOCIAL_LINKS.phone}
-          </p>
+          <div className="flex items-center gap-3">
+            <span>Handcrafted in Maryland • WhatsApp: {MASEH_SOCIAL_LINKS.phone}</span>
+            <span className="text-white/20">•</span>
+            <button
+              onClick={() => setCurrentView('admin')}
+              className="text-white/40 hover:text-[#D99B26] transition-colors underline cursor-pointer text-[11px]"
+              title="Maseh's Bakery Operations Hub"
+            >
+              Staff Portal
+            </button>
+          </div>
         </div>
 
       </div>

@@ -268,6 +268,17 @@ export const Header: React.FC = () => {
                 <span>Track Order</span>
                 <ChevronRight className="w-4 h-4 text-[#7A6C65]" />
               </button>
+
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  setCurrentView('admin');
+                }}
+                className="text-left py-2 text-xs font-bold text-[#C85A32] flex items-center justify-between bg-[#C85A32]/10 px-3 py-2 rounded-xl"
+              >
+                <span>Staff Operations Hub</span>
+                <ChevronRight className="w-4 h-4 text-[#C85A32]" />
+              </button>
             </div>
 
             <div className="pt-3 border-t border-[#231712]/8">

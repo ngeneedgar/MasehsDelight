@@ -133,7 +133,67 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   });
 
-  const [currentView, setCurrentView] = useState<AppView>('storefront');
+  const checkIsAdmin = () => {
+    if (typeof window === 'undefined') return false;
+    const hash = window.location.hash.toLowerCase();
+    const path = window.location.pathname.toLowerCase();
+    const search = window.location.search.toLowerCase();
+    return hash.includes('admin') || path.includes('/admin') || path.endsWith('admin') || search.includes('admin');
+  };
+
+  const checkIsTracking = () => {
+    if (typeof window === 'undefined') return false;
+    const hash = window.location.hash.toLowerCase();
+    const path = window.location.pathname.toLowerCase();
+    return hash.includes('track') || path.includes('/track');
+  };
+
+  const [currentView, setCurrentViewState] = useState<AppView>(() => {
+    if (checkIsAdmin()) return 'admin';
+    if (checkIsTracking()) return 'order-tracking';
+    return 'storefront';
+  });
+
+  const setCurrentView = (view: AppView) => {
+    setCurrentViewState(view);
+    if (typeof window !== 'undefined') {
+      if (view === 'admin') {
+        window.location.hash = 'admin';
+      } else if (view === 'order-tracking') {
+        window.location.hash = 'track';
+      } else if (view === 'storefront') {
+        if (window.location.hash.includes('admin') || window.location.hash.includes('track')) {
+          history.pushState(null, '', window.location.pathname);
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleUrlChange = () => {
+      if (checkIsAdmin()) {
+        setCurrentViewState('admin');
+      } else if (checkIsTracking()) {
+        setCurrentViewState('order-tracking');
+      } else {
+        const hash = window.location.hash.toLowerCase();
+        if (!hash || hash === '#' || hash === '#storefront' || hash === '#menu' || hash === '#home') {
+          setCurrentViewState('storefront');
+        }
+      }
+    };
+
+    window.addEventListener('hashchange', handleUrlChange);
+    window.addEventListener('popstate', handleUrlChange);
+    // Initial verification on mount
+    handleUrlChange();
+
+    return () => {
+      window.removeEventListener('hashchange', handleUrlChange);
+      window.removeEventListener('popstate', handleUrlChange);
+    };
+  }, []);
+
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   // ══════════════════════════════════════════════════════════════════

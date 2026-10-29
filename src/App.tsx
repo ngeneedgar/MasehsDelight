@@ -23,6 +23,10 @@ import { FloatingWhatsAppButton } from './components/FloatingWhatsAppButton';
 const MainContent: React.FC = () => {
   const { currentView } = useBakery();
 
+  if (currentView === 'admin') {
+    return <AdminDashboard />;
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-[#FAF6EE] text-[#231712]">
       {/* 1 & 2. Slim Announcement Bar and Clean Navigation */}
@@ -62,12 +66,6 @@ const MainContent: React.FC = () => {
           {currentView === 'order-tracking' && (
             <div className="py-6">
               <OrderTrackerView />
-            </div>
-          )}
-
-          {currentView === 'admin' && (
-            <div className="py-6">
-              <AdminDashboard />
             </div>
           )}
         </main>
