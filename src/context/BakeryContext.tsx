@@ -106,6 +106,52 @@ interface BakeryContextType {
 
 const BakeryContext = createContext<BakeryContextType | undefined>(undefined);
 
+function isValidProductRecord(p: any): p is Product {
+  return (
+    p &&
+    typeof p === 'object' &&
+    typeof p.id === 'string' &&
+    p.id.length > 0 &&
+    typeof p.name === 'string' &&
+    p.name.length > 0 &&
+    Array.isArray(p.sizes) &&
+    p.sizes.length > 0
+  );
+}
+
+function mergeWithInitialProducts(incomingList: any[]): Product[] {
+  if (!Array.isArray(incomingList) || incomingList.length === 0) {
+    return INITIAL_PRODUCTS;
+  }
+  
+  const map = new Map<string, Product>();
+  // Prepopulate with all 8 authentic initial products
+  INITIAL_PRODUCTS.forEach(p => map.set(p.id, { ...p }));
+
+  // Overlay any valid incoming products
+  incomingList.forEach(raw => {
+    if (isValidProductRecord(raw)) {
+      const existing = map.get(raw.id);
+      map.set(raw.id, {
+        ...(existing || raw),
+        ...raw,
+        imageUrl: raw.imageUrl || existing?.imageUrl || INITIAL_PRODUCTS[0].imageUrl,
+        active: raw.active !== false,
+        inStock: raw.inStock !== false,
+        minPrice: typeof raw.minPrice === 'number' && raw.minPrice > 0 
+          ? raw.minPrice 
+          : (raw.sizes?.[0]?.price || existing?.minPrice || 50),
+        maxPrice: typeof raw.maxPrice === 'number' && raw.maxPrice > 0 
+          ? raw.maxPrice 
+          : (raw.sizes?.[raw.sizes.length - 1]?.price || existing?.maxPrice || 110),
+      });
+    }
+  });
+
+  const merged = Array.from(map.values());
+  return merged.length >= INITIAL_PRODUCTS.length ? merged : INITIAL_PRODUCTS;
+}
+
 export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isCloudSynced, setIsCloudSynced] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -113,15 +159,46 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isCustomCakeModalOpen, setIsCustomCakeModalOpen] = useState(false);
 
-  // Products
+  // Products - always guarantee complete 8 bakery products fallback
   const [products, setProducts] = useState<Product[]>(() => {
     try {
-      const saved = localStorage.getItem('maseh_products_v4');
-      return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
+      // Purge legacy corrupted storage keys from previous database schemas
+      localStorage.removeItem('maseh_products_v4');
+      localStorage.removeItem('maseh_products_v3');
+      localStorage.removeItem('maseh_products_v2');
+      localStorage.removeItem('maseh_products_v1');
+
+      const saved = localStorage.getItem('maseh_products_v5');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length >= 8) {
+          return mergeWithInitialProducts(parsed);
+        }
+      }
+      return INITIAL_PRODUCTS;
     } catch {
       return INITIAL_PRODUCTS;
     }
   });
+
+  // Ensure products array never drops below complete 8 bakery catalog
+  useEffect(() => {
+    if (!products || products.length < 8) {
+      setProducts(INITIAL_PRODUCTS);
+    }
+  }, [products]);
+
+  // Fetch /api/products from backend to ensure synchronization
+  useEffect(() => {
+    fetch('/api/products')
+      .then(res => res.json())
+      .then((serverProds: Product[]) => {
+        if (Array.isArray(serverProds) && serverProds.length >= 8) {
+          setProducts(prev => mergeWithInitialProducts(serverProds));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Blog Posts
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>(() => {
@@ -283,17 +360,30 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Firestore Sync Listeners
   useEffect(() => {
+    // Proactively self-heal Firestore database so all 8 products are properly saved
+    INITIAL_PRODUCTS.forEach(p => {
+      setDoc(doc(db, 'products', p.id), p, { merge: true }).catch(() => {});
+    });
+
     const unsubProducts = onSnapshot(
       collection(db, 'products'),
       (snapshot) => {
         if (!snapshot.empty) {
-          const cloudProds = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
-          setProducts(cloudProds);
+          const cloudProds = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          const sanitized = mergeWithInitialProducts(cloudProds);
+          setProducts(sanitized);
           setIsCloudSynced(true);
+        } else {
+          // If Firestore collection has no documents yet, seed INITIAL_PRODUCTS so database is initialized
+          INITIAL_PRODUCTS.forEach(p => {
+            setDoc(doc(db, 'products', p.id), p, { merge: true }).catch(() => {});
+          });
+          setProducts(INITIAL_PRODUCTS);
         }
       },
       (err) => {
         handleFirestoreError(err, OperationType.GET, 'products');
+        setProducts(prev => (prev && prev.length >= 8 ? prev : INITIAL_PRODUCTS));
       }
     );
 
@@ -347,7 +437,9 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Local storage persistence
   useEffect(() => {
-    localStorage.setItem('maseh_products_v4', JSON.stringify(products));
+    if (products && products.length >= 8) {
+      localStorage.setItem('maseh_products_v5', JSON.stringify(products));
+    }
   }, [products]);
 
   useEffect(() => {

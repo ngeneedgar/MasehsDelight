@@ -165,6 +165,31 @@ h4, h5, h6, .font-sans {
 }
 .btn-secondary:hover {
   border-color: #8E2745;
+  background-color: rgba(142, 39, 69, 0.04);
+}
+
+.btn-secondary-light {
+  background-color: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.75rem;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+.btn-secondary-light:hover {
+  background-color: rgba(255, 255, 255, 0.22);
+  border-color: #FFFFFF;
+  color: #FFFFFF !important;
+}
+.btn-secondary:hover {
+  border-color: #8E2745;
   color: #8E2745;
   background-color: rgba(142, 39, 69, 0.05);
   transform: translateY(-1px);

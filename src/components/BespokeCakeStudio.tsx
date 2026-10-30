@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useBakery } from '../context/BakeryContext';
-import { ChefHat, Calendar, Check, Send, Sparkles, Cake, ShieldCheck } from 'lucide-react';
-import { MASEH_ASSETS } from '../data/initialData';
+import { ChefHat, Calendar, Check, Send, Sparkles, Cake, ShieldCheck, MessageSquare } from 'lucide-react';
+import { MASEH_ASSETS, MASEH_SETTINGS } from '../data/initialData';
 
 export const BespokeCakeStudio: React.FC = () => {
   const { submitBespokeInquiry, isCustomCakeModalOpen, setIsCustomCakeModalOpen } = useBakery();
@@ -99,6 +99,16 @@ export const BespokeCakeStudio: React.FC = () => {
                 <Cake className="w-4 h-4" />
                 <span>Request a Custom Cake</span>
               </button>
+
+              <a
+                href={MASEH_SETTINGS.whatsappUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-xs font-bold py-3 px-4 rounded-xl bg-[#25D366] hover:bg-[#20ba5a] text-white shadow-sm transition-all cursor-pointer"
+              >
+                <MessageSquare className="w-4 h-4 text-white fill-white" />
+                <span className="text-white font-bold">Chat on WhatsApp</span>
+              </a>
 
               <div className="flex items-center gap-1.5 text-xs text-[#4C9B72] font-semibold">
                 <ShieldCheck className="w-4 h-4" />

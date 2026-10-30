@@ -27,6 +27,8 @@ import { Footer } from './components/Footer';
 import { MobileBottomNav } from './components/MobileBottomNav';
 import { FloatingWhatsAppButton } from './components/FloatingWhatsAppButton';
 
+import { ShopPage } from './components/ShopPage';
+
 const MainContent: React.FC = () => {
   const { currentView } = useBakery();
 
@@ -76,9 +78,7 @@ const MainContent: React.FC = () => {
 
           {/* SHOP PAGE */}
           {currentView === 'shop' && (
-            <div className="py-4">
-              <MenuGrid isFullShop={true} />
-            </div>
+            <ShopPage />
           )}
 
           {/* ABOUT PAGE */}

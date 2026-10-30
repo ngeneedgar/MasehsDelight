@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useBakery } from '../context/BakeryContext';
 import { MASEH_ASSETS } from '../data/initialData';
-import { ShoppingBag, Heart, Search, Menu, X, ChevronRight, Phone, ShieldCheck } from 'lucide-react';
+import { ShoppingBag, Heart, Search, Menu, X, ChevronRight, Phone, ShieldCheck, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 const ANNOUNCEMENTS = [
@@ -38,6 +38,9 @@ export const Header: React.FC = () => {
     setIsMobileMenuOpen(false);
     if (category) {
       setSelectedCategory(category);
+    } else if (view === 'shop') {
+      setSelectedCategory('All');
+      setSearchQuery('');
     }
     setCurrentView(view);
   };
@@ -76,13 +79,24 @@ export const Header: React.FC = () => {
           </AnimatePresence>
         </div>
 
-        <a
-          href="tel:+12406190313"
-          className="hidden md:flex items-center gap-1 text-white/80 hover:text-[#F5C84B] transition-colors text-[11px] font-medium"
-        >
-          <Phone className="w-3 h-3 text-[#F5C84B]" />
-          <span>(240) 619-0313</span>
-        </a>
+        <div className="hidden md:flex items-center gap-3">
+          <a
+            href="tel:+12406190313"
+            className="flex items-center gap-1 text-white/80 hover:text-[#F5C84B] transition-colors text-[11px] font-medium"
+          >
+            <Phone className="w-3 h-3 text-[#F5C84B]" />
+            <span>(240) 619-0313</span>
+          </a>
+          <span className="text-white/30">|</span>
+          <button
+            onClick={() => handleNav('admin')}
+            className="flex items-center gap-1 text-white/90 hover:text-[#F5C84B] transition-colors text-[11px] font-semibold cursor-pointer"
+            title="Bakery Staff & Admin Dashboard"
+          >
+            <Lock className="w-3 h-3 text-[#F5C84B]" />
+            <span>Staff Portal</span>
+          </button>
+        </div>
       </div>
 
       {/* 2. MAIN NAVBAR */}

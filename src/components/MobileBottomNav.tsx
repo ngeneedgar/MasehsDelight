@@ -6,6 +6,8 @@ export const MobileBottomNav: React.FC = () => {
   const {
     currentView,
     setCurrentView,
+    setSelectedCategory,
+    setSearchQuery,
     cartCount,
     setIsCartOpen,
     setIsCustomCakeModalOpen
@@ -28,7 +30,11 @@ export const MobileBottomNav: React.FC = () => {
 
         {/* Shop */}
         <button
-          onClick={() => setCurrentView('shop')}
+          onClick={() => {
+            setSelectedCategory('All');
+            setSearchQuery('');
+            setCurrentView('shop');
+          }}
           className={`flex flex-col items-center gap-1 p-1 text-xs cursor-pointer ${
             currentView === 'shop' ? 'text-[#D93462] font-bold' : 'text-[#806D6A]'
           }`}
