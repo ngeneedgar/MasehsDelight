@@ -20,6 +20,7 @@ import { ContactPage } from './components/ContactPage';
 import { DeliveryInfoPage } from './components/DeliveryInfoPage';
 import { TermsPoliciesPage } from './components/TermsPoliciesPage';
 import { CartDrawer } from './components/CartDrawer';
+import { CustomCakeModal } from './components/CustomCakeModal';
 import { OrderConfirmationModal } from './components/OrderConfirmationModal';
 import { OrderTrackerView } from './components/OrderTrackerView';
 import { AdminDashboard } from './components/AdminDashboard';
@@ -119,6 +120,9 @@ const MainContent: React.FC = () => {
 
       {/* Slide-over Cart Drawer and Checkout with Payment on Delivery */}
       <CartDrawer />
+
+      {/* Universal Responsive Custom Cake Modal */}
+      <CustomCakeModal />
 
       {/* Floating WhatsApp Button */}
       <FloatingWhatsAppButton />
