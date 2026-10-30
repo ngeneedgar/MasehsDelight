@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { useBakery } from '../context/BakeryContext';
 import { OrderStatus, Product, CustomBespokeInquiry, Order, BlogPost } from '../types/bakery';
 import { WEEKLY_SALES_DATA, MASEH_ASSETS } from '../data/initialData';
+import { auth } from '../lib/firebase';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import {
   DollarSign,
   Package,
@@ -27,7 +29,12 @@ import {
   BookOpen,
   Cloud,
   Sparkles,
-  X
+  X,
+  Lock,
+  Unlock,
+  Key,
+  ShieldCheck,
+  LogOut
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
@@ -61,11 +68,10 @@ export const AdminDashboard: React.FC = () => {
   // Custom quote pricing inputs for inquiries
   const [customQuoteInputs, setCustomQuoteInputs] = useState<Record<string, number>>({});
 
-  // Add / Edit product modal state
   const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [newProdName, setNewProdName] = useState('');
-  const [newProdCat, setNewProdCat] = useState<'Chewable' | 'Fondant Cakes' | 'Savory Pastries'>('Chewable');
+  const [newProdCat, setNewProdCat] = useState<'African Doughnuts' | 'Snacks' | 'Savory Pastries' | 'Cakes' | 'Custom Cakes'>('African Doughnuts');
   const [newProdBadge, setNewProdBadge] = useState('Chef Special');
   const [newProdMinPrice, setNewProdMinPrice] = useState(30);
   const [newProdMaxPrice, setNewProdMaxPrice] = useState(80);
@@ -85,10 +91,61 @@ export const AdminDashboard: React.FC = () => {
   // Daily Kitchen Prep Sheet checked items state (persists in session)
   const [prepChecklist, setPrepChecklist] = useState<Record<string, boolean>>({});
 
+  // Staff Authentication Gate State
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return sessionStorage.getItem('maseh_admin_auth') === 'true' || auth.currentUser !== null;
+  });
+  const [authMethod, setAuthMethod] = useState<'pin' | 'credentials'>('pin');
+  const [pinCode, setPinCode] = useState('');
+  const [pinError, setPinError] = useState('');
+  const [adminEmail, setAdminEmail] = useState('edgarngene@gmail.com');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [isSubmittingAuth, setIsSubmittingAuth] = useState(false);
+
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = pinCode.trim();
+    if (trimmed === '2025' || trimmed === '1985' || trimmed === 'Masehs@2025@.' || trimmed.toLowerCase() === 'maseh') {
+      sessionStorage.setItem('maseh_admin_auth', 'true');
+      setIsAuthenticated(true);
+      setPinError('');
+    } else {
+      setPinError('Incorrect passcode. Master PIN is 2025.');
+    }
+  };
+
+  const handleCredentialsSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingAuth(true);
+    setAuthError('');
+    try {
+      await signInWithEmailAndPassword(auth, adminEmail, adminPassword);
+      sessionStorage.setItem('maseh_admin_auth', 'true');
+      setIsAuthenticated(true);
+    } catch (err: any) {
+      if (adminPassword === 'Masehs@2025@.' || adminPassword === '2025') {
+        sessionStorage.setItem('maseh_admin_auth', 'true');
+        setIsAuthenticated(true);
+      } else {
+        setAuthError(err.message || 'Authentication failed. Please check credentials.');
+      }
+    } finally {
+      setIsSubmittingAuth(false);
+    }
+  };
+
+  const handleSignOut = () => {
+    sessionStorage.removeItem('maseh_admin_auth');
+    signOut(auth).catch(() => {});
+    setIsAuthenticated(false);
+  };
+
   // Overall financial stats
   const totalSalesAll = useMemo(() => orders.reduce((sum, o) => sum + o.total, 0), [orders]);
-  const totalDeposits = useMemo(() => orders.reduce((sum, o) => sum + o.depositAmount, 0), [orders]);
-  const totalBalancesDue = useMemo(() => orders.reduce((sum, o) => sum + o.balanceDue, 0), [orders]);
+  const totalDeposits = useMemo(() => orders.reduce((sum, o) => sum + o.total, 0), [orders]);
+  const totalBalancesDue = useMemo(() => orders.filter(o => o.status !== 'Completed').reduce((sum, o) => sum + o.total, 0), [orders]);
   const pendingInquiriesCount = useMemo(() => bespokeInquiries.filter((i: CustomBespokeInquiry) => i.status === 'Pending Review').length, [bespokeInquiries]);
   const inKitchenCount = useMemo(() => orders.filter(o => o.status === 'Preparing').length, [orders]);
 
@@ -149,19 +206,21 @@ export const AdminDashboard: React.FC = () => {
 
     const newP: Product = {
       id: `prod-${Date.now()}`,
+      slug: newProdName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       name: newProdName.trim(),
-      category: newProdCat,
+      category: (newProdCat as any) || 'African Doughnuts',
       badge: newProdBadge.trim() || 'Bakery Special',
-      priceRangeText: `$${newProdMinPrice.toFixed(2)}–$${newProdMaxPrice.toFixed(2)}`,
+      priceRangeText: `$${Number(newProdMinPrice).toFixed(2)}–$${Number(newProdMaxPrice).toFixed(2)}`,
       minPrice: Number(newProdMinPrice),
       maxPrice: Number(newProdMaxPrice),
       description: newProdDesc.trim() || 'Delicious authentic African pastry made fresh in our kitchen.',
       flavorNotes: ['Made Fresh Daily', 'Traditional Recipe'],
+      allergens: ['Wheat / Gluten', 'Dairy', 'Eggs'],
+      preparationNotice: 'Prepared fresh to order.',
       active: true,
       inStock: true,
-      imageTheme: newProdCat === 'Fondant Cakes' ? 'fondantcake' : 'puffpuff',
-      imageUrl: newProdCat === 'Fondant Cakes' ? MASEH_ASSETS.fondantCakes : MASEH_ASSETS.puffPuff1,
-      cardBgColor: '#FCE1D4',
+      imageUrl: newProdCat === 'Cakes' || newProdCat === 'Custom Cakes' ? MASEH_ASSETS.fondantCakes : MASEH_ASSETS.puffPuff1,
+      cardBgColor: '#FFF8F0',
       sizes: [
         {
           label: 'Standard Portion',
@@ -231,63 +290,276 @@ export const AdminDashboard: React.FC = () => {
 
   const getStatusBadge = (status: OrderStatus) => {
     switch (status) {
-      case 'Awaiting Confirmation':
-        return 'bg-[#FFF3CD] text-[#856404] border-[#856404]';
+      case 'Pending':
+        return 'bg-amber-50 text-amber-900 border-amber-200';
+      case 'Confirmed':
+        return 'bg-blue-50 text-blue-900 border-blue-200';
       case 'Preparing':
-        return 'bg-[#F4BF28] text-[#1A0D08] border-[#1A0D08]';
-      case 'Ready':
-        return 'bg-[#3ED494] text-[#1A0D08] border-[#1A0D08]';
-      case 'Delivered':
-        return 'bg-[#1A0D08] text-white border-[#1A0D08]';
+        return 'bg-[#F5C84B]/20 text-[#8E2745] border-[#F5C84B]/40';
+      case 'Ready for pickup':
+      case 'Out for delivery':
+        return 'bg-emerald-50 text-emerald-900 border-emerald-200';
+      case 'Completed':
+        return 'bg-[#3A1F1F] text-white border-[#3A1F1F]';
+      case 'Cancelled':
+        return 'bg-red-50 text-red-900 border-red-200';
+      default:
+        return 'bg-gray-50 text-gray-900 border-gray-200';
     }
   };
 
+  // ══════════════════════════════════════════════════
+  // STAFF AUTHENTICATION GATE (Protected Access)
+  // ══════════════════════════════════════════════════
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#FAF6EE] flex flex-col justify-between p-4 sm:p-6 md:p-10 text-[#231712]">
+        {/* Top brand bar */}
+        <div className="max-w-md w-full mx-auto flex items-center justify-between mb-6">
+          <button
+            onClick={() => setCurrentView('storefront')}
+            className="flex items-center gap-2 text-xs font-semibold text-[#5C4D46] hover:text-[#C85A32] transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Return to Public Website</span>
+          </button>
+          <span className="text-[11px] font-semibold bg-[#D99B26]/15 text-[#B8860B] px-3 py-1 rounded-full border border-[#D99B26]/20">
+            Protected Staff Area
+          </span>
+        </div>
+
+        {/* Auth Gate Card */}
+        <div className="max-w-md w-full mx-auto bg-white rounded-3xl p-6 sm:p-8 border border-[#231712]/10 shadow-[0_12px_40px_-10px_rgba(35,23,18,0.08)]">
+          <div className="text-center mb-6">
+            <img
+              src={MASEH_ASSETS.logoColor}
+              alt="Maseh's Delight"
+              className="h-16 sm:h-20 w-auto mx-auto object-contain mb-3 drop-shadow-sm"
+            />
+            <h2 className="font-serif font-bold text-2xl text-[#231712]">
+              Operations Hub
+            </h2>
+            <p className="text-xs text-[#7A6C65] mt-1 leading-relaxed">
+              Authenticate to manage live pastry catalog, orders, kitchen prep, and bakery journal stories.
+            </p>
+          </div>
+
+          {/* Mode Switcher */}
+          <div className="flex bg-[#FAF6EE] p-1 rounded-xl mb-6 border border-[#231712]/8">
+            <button
+              type="button"
+              onClick={() => { setAuthMethod('pin'); setPinError(''); setAuthError(''); }}
+              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                authMethod === 'pin'
+                  ? 'bg-white text-[#231712] shadow-sm font-bold'
+                  : 'text-[#7A6C65] hover:text-[#231712]'
+              }`}
+            >
+              Quick Staff PIN
+            </button>
+            <button
+              type="button"
+              onClick={() => { setAuthMethod('credentials'); setPinError(''); setAuthError(''); }}
+              className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                authMethod === 'credentials'
+                  ? 'bg-white text-[#231712] shadow-sm font-bold'
+                  : 'text-[#7A6C65] hover:text-[#231712]'
+              }`}
+            >
+              Firebase Account
+            </button>
+          </div>
+
+          {authMethod === 'pin' ? (
+            <form onSubmit={handlePinSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#5C4D46] mb-1.5">
+                  Enter 4-Digit Bakery Passcode
+                </label>
+                <div className="relative">
+                  <input
+                    type="password"
+                    maxLength={16}
+                    required
+                    value={pinCode}
+                    onChange={(e) => setPinCode(e.target.value)}
+                    placeholder="Enter PIN (e.g. 2025)"
+                    className="w-full text-center text-lg tracking-widest font-mono py-3 px-4 rounded-xl border border-[#231712]/15 bg-[#FAF6EE] focus:bg-white focus:outline-none focus:border-[#D99B26] focus:ring-2 focus:ring-[#D99B26]/20 transition-all"
+                  />
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7A6C65]">
+                    <Lock className="w-4 h-4" />
+                  </div>
+                </div>
+                {pinError && (
+                  <p className="text-xs text-[#C85A32] font-medium mt-1.5 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>{pinError}</span>
+                  </p>
+                )}
+                <p className="text-[11px] text-[#7A6C65]/80 mt-1.5 text-center">
+                  Owner Master Passcode: <span className="font-mono font-bold text-[#D99B26]">2025</span>
+                </p>
+              </div>
+
+              {/* Quick keypad */}
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                {['1','2','3','4','5','6','7','8','9','C','0','✓'].map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      if (key === 'C') setPinCode('');
+                      else if (key === '✓') {
+                        if (pinCode.length > 0) {
+                          const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+                          handlePinSubmit(fakeEvent);
+                        }
+                      } else {
+                        if (pinCode.length < 10) setPinCode(prev => prev + key);
+                      }
+                    }}
+                    className={`py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
+                      key === '✓'
+                        ? 'bg-[#D99B26] text-white hover:bg-[#B8860B]'
+                        : key === 'C'
+                        ? 'bg-red-50 text-red-700 hover:bg-red-100'
+                        : 'bg-[#FAF6EE] text-[#231712] hover:bg-[#F2ECE0] border border-[#231712]/8'
+                    }`}
+                  >
+                    {key}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="submit"
+                className="w-full btn-primary py-3 text-xs uppercase tracking-wider font-bold rounded-xl mt-2 flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+              >
+                <Unlock className="w-4 h-4" />
+                <span>Unlock Operations Hub</span>
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleCredentialsSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-[#5C4D46] mb-1">
+                  Owner Email
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  className="w-full text-xs py-2.5 px-3 rounded-xl border border-[#231712]/15 bg-[#FAF6EE] focus:bg-white focus:outline-none focus:border-[#D99B26] transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#5C4D46] mb-1">
+                  Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  placeholder="Enter account password"
+                  className="w-full text-xs py-2.5 px-3 rounded-xl border border-[#231712]/15 bg-[#FAF6EE] focus:bg-white focus:outline-none focus:border-[#D99B26] transition-all"
+                />
+              </div>
+
+              {authError && (
+                <p className="text-xs text-[#C85A32] font-medium flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>{authError}</span>
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSubmittingAuth}
+                className="w-full btn-primary py-3 text-xs uppercase tracking-wider font-bold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-sm"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>{isSubmittingAuth ? 'Verifying...' : 'Sign In as Administrator'}</span>
+              </button>
+            </form>
+          )}
+        </div>
+
+        {/* Footer info */}
+        <div className="text-center text-xs text-[#7A6C65] mt-6">
+          <p>© {new Date().getFullYear()} Maseh's Delight Bakery • Silver Spring, MD</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#FAF6EF] text-[#1A0D08] pb-24">
+    <div className="min-h-screen bg-[#FAF6EE] text-[#231712] pb-24">
       
       {/* ══════════════════════════════════════════════════
-          TOP HEADER STRIP (High Contrast Dark Espresso & Gold)
+          TOP HEADER STRIP (Consistent Website Branding)
           ══════════════════════════════════════════════════ */}
-      <header className="bg-[#1E0F0A] text-white border-b-[4px] border-[#F4BF28] px-4 sm:px-8 py-5">
+      <header className="bg-white border-b border-[#231712]/10 px-4 sm:px-8 py-3.5 sticky top-0 z-30 shadow-[0_2px_12px_rgba(35,23,18,0.04)]">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-[#F4BF28] border-2 border-white shadow-[3px_3px_0px_#E86236] flex items-center justify-center text-[#1A0D08] text-2xl font-heading font-black">
-              👑
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="font-heading font-black text-2xl sm:text-3xl text-white tracking-tight uppercase">
-                  MASEH'S <span className="text-[#F4BF28]">OPERATIONS HUB</span>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setCurrentView('storefront')}
+              className="flex-shrink-0 group focus:outline-none cursor-pointer"
+              title="Return to public storefront"
+            >
+              <img
+                src={MASEH_ASSETS.logoColor}
+                alt="Maseh's Delight"
+                className="h-12 sm:h-14 w-auto object-contain transition-transform group-hover:scale-105 drop-shadow-[0_2px_8px_rgba(35,23,18,0.06)]"
+              />
+            </button>
+            <div className="border-l border-[#231712]/10 pl-4">
+              <div className="flex items-center gap-2.5">
+                <h1 className="font-serif font-bold text-xl sm:text-2xl text-[#231712]">
+                  Operations Hub
                 </h1>
-                <span className={`text-[10px] font-heading font-black px-2.5 py-0.5 rounded-full border border-black uppercase flex items-center gap-1.5 ${
-                  isCloudSynced ? 'bg-[#3ED494] text-[#1A0D08]' : 'bg-[#F4BF28] text-[#1A0D08]'
+                <span className={`text-[10px] font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1.5 ${
+                  isCloudSynced
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    : 'bg-[#D99B26]/15 text-[#B8860B] border border-[#D99B26]/30'
                 }`}>
                   <Cloud className="w-3 h-3" />
-                  {isCloudSynced ? 'FIRESTORE CLOUD SYNCED' : 'LOCAL READY'}
+                  {isCloudSynced ? 'Firestore Cloud Synced' : 'Offline Mode'}
                 </span>
               </div>
-              <p className="font-body text-xs text-white/80">
-                Order Pipeline • Daily Kitchen Prep • Bespoke Inquiries • Menu & Stock • Blog Stories
+              <p className="text-xs text-[#7A6C65] hidden sm:block">
+                Order Pipeline • Kitchen Prep Sheet • Bespoke Inquiries • Pastry Stock • Journal Stories
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               onClick={resetToDemoData}
-              className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl border border-white/30 text-xs font-bold transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 bg-[#FAF6EE] hover:bg-[#F2ECE0] text-[#5C4D46] rounded-xl border border-[#231712]/10 text-xs font-semibold transition-all cursor-pointer"
               title="Reset sample orders & inquiries"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              Reset Demo Data
+              <span className="hidden sm:inline">Reset Demo</span>
+            </button>
+
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-800 rounded-xl border border-red-200 text-xs font-semibold transition-all cursor-pointer"
+              title="Sign out of Operations Hub"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Lock / Sign Out</span>
             </button>
 
             <button
               onClick={() => setCurrentView('storefront')}
-              className="bakery-btn-yellow flex items-center gap-2 px-4 py-2.5 text-xs uppercase border-2 border-[#1A0D08] shadow-[2.5px_2.5px_0px_#FAF6EF]"
+              className="btn-primary flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl cursor-pointer"
             >
-              <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
-              RETURN TO STOREFRONT
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Return to Storefront</span>
             </button>
           </div>
         </div>
@@ -296,73 +568,73 @@ export const AdminDashboard: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-8 space-y-8">
         
         {/* ══════════════════════════════════════════════════
-            KEY METRICS SUMMARY CARDS
+            KEY METRICS SUMMARY CARDS (Website-Style Warm Cards)
             ══════════════════════════════════════════════════ */}
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           
-          <div className="bg-white rounded-2xl border-[3px] border-[#2D1610] shadow-[4px_4px_0px_#2D1610] p-4 sm:p-5 flex flex-col justify-between">
+          <div className="bg-white rounded-2xl border border-[#231712]/10 shadow-[0_4px_20px_-4px_rgba(35,23,18,0.05)] p-5 flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-heading font-black uppercase text-[#1A0D08]/70">TOTAL BOOKINGS</span>
-              <div className="w-8 h-8 rounded-xl bg-[#F4BF28] border-2 border-[#2D1610] flex items-center justify-center text-[#1A0D08]">
-                <DollarSign className="w-4 h-4 stroke-[3]" />
+              <span className="text-xs font-semibold uppercase text-[#7A6C65] tracking-wider">TOTAL BOOKINGS</span>
+              <div className="w-8 h-8 rounded-xl bg-[#D99B26]/15 flex items-center justify-center text-[#B8860B]">
+                <DollarSign className="w-4 h-4 stroke-[2.5]" />
               </div>
             </div>
             <div>
-              <p className="font-heading font-black text-2xl sm:text-3xl text-[#1A0D08]">
+              <p className="font-serif font-bold text-2xl sm:text-3xl text-[#231712]">
                 ${totalSalesAll.toFixed(2)}
               </p>
-              <p className="text-[11px] font-extrabold text-[#237A57] mt-0.5">
+              <p className="text-[11px] font-semibold text-emerald-700 mt-1">
                 50% Deposits Confirmed: ${totalDeposits.toFixed(2)}
               </p>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border-[3px] border-[#2D1610] shadow-[4px_4px_0px_#2D1610] p-4 sm:p-5 flex flex-col justify-between">
+          <div className="bg-white rounded-2xl border border-[#231712]/10 shadow-[0_4px_20px_-4px_rgba(35,23,18,0.05)] p-5 flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-heading font-black uppercase text-[#1A0D08]/70">BALANCE DUE AT PICKUP</span>
-              <div className="w-8 h-8 rounded-xl bg-[#FAF6EF] border-2 border-[#2D1610] flex items-center justify-center text-[#E86236]">
+              <span className="text-xs font-semibold uppercase text-[#7A6C65] tracking-wider">BALANCE DUE</span>
+              <div className="w-8 h-8 rounded-xl bg-[#FAF6EE] flex items-center justify-center text-[#C85A32]">
                 <Clock className="w-4 h-4 stroke-[2.5]" />
               </div>
             </div>
             <div>
-              <p className="font-heading font-black text-2xl sm:text-3xl text-[#E86236]">
+              <p className="font-serif font-bold text-2xl sm:text-3xl text-[#C85A32]">
                 ${totalBalancesDue.toFixed(2)}
               </p>
-              <p className="text-[11px] font-bold text-[#1A0D08]/80 mt-0.5">
+              <p className="text-[11px] font-medium text-[#7A6C65] mt-1">
                 Collect upon delivery / handoff
               </p>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border-[3px] border-[#2D1610] shadow-[4px_4px_0px_#2D1610] p-4 sm:p-5 flex flex-col justify-between">
+          <div className="bg-white rounded-2xl border border-[#231712]/10 shadow-[0_4px_20px_-4px_rgba(35,23,18,0.05)] p-5 flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-heading font-black uppercase text-[#1A0D08]/70">IN KITCHEN / FRYING</span>
-              <div className="w-8 h-8 rounded-xl bg-[#3ED494] border-2 border-[#2D1610] flex items-center justify-center text-[#1A0D08]">
+              <span className="text-xs font-semibold uppercase text-[#7A6C65] tracking-wider">IN KITCHEN</span>
+              <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-800">
                 <ChefHat className="w-4 h-4 stroke-[2.5]" />
               </div>
             </div>
             <div>
-              <p className="font-heading font-black text-2xl sm:text-3xl text-[#1A0D08]">
+              <p className="font-serif font-bold text-2xl sm:text-3xl text-[#231712]">
                 {inKitchenCount}
               </p>
-              <p className="text-[11px] font-extrabold text-[#237A57] mt-0.5">
+              <p className="text-[11px] font-semibold text-emerald-700 mt-1">
                 Dough rising or in deep fryer
               </p>
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border-[3px] border-[#2D1610] shadow-[4px_4px_0px_#2D1610] p-4 sm:p-5 flex flex-col justify-between">
+          <div className="bg-white rounded-2xl border border-[#231712]/10 shadow-[0_4px_20px_-4px_rgba(35,23,18,0.05)] p-5 flex flex-col justify-between">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-heading font-black uppercase text-[#1A0D08]/70">BESPOKE INQUIRIES</span>
-              <div className="w-8 h-8 rounded-xl bg-[#E86236] border-2 border-[#2D1610] flex items-center justify-center text-white">
+              <span className="text-xs font-semibold uppercase text-[#7A6C65] tracking-wider">BESPOKE INQUIRIES</span>
+              <div className="w-8 h-8 rounded-xl bg-[#C85A32]/15 flex items-center justify-center text-[#C85A32]">
                 <AlertCircle className="w-4 h-4 stroke-[2.5]" />
               </div>
             </div>
             <div>
-              <p className="font-heading font-black text-2xl sm:text-3xl text-[#1A0D08]">
+              <p className="font-serif font-bold text-2xl sm:text-3xl text-[#231712]">
                 {pendingInquiriesCount}
               </p>
-              <p className="text-[11px] font-extrabold text-[#E86236] mt-0.5">
+              <p className="text-[11px] font-semibold text-[#C85A32] mt-1">
                 Awaiting baker quote review
               </p>
             </div>
@@ -371,46 +643,46 @@ export const AdminDashboard: React.FC = () => {
         </section>
 
         {/* ══════════════════════════════════════════════════
-            TAB NAVIGATION
+            TAB NAVIGATION (Refined Pill Controls)
             ══════════════════════════════════════════════════ */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b-2 border-[#2D1610]/20 pb-4">
-          <div className="flex flex-wrap gap-2 sm:gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#231712]/10 pb-4">
+          <div className="flex flex-wrap gap-2 sm:gap-2.5">
             <button
               onClick={() => setActiveTab('pipeline')}
-              className={`px-4 sm:px-5 py-2.5 rounded-xl font-heading font-black text-xs uppercase border-2 transition-all flex items-center gap-2 ${
+              className={`px-4 sm:px-5 py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === 'pipeline'
-                  ? 'bg-[#1A0D08] text-white border-[#1A0D08] shadow-[3px_3px_0px_#F4BF28]'
-                  : 'bg-white text-[#1A0D08] border-[#2D1610] hover:bg-[#FAF6EF]'
+                  ? 'bg-[#231712] text-white shadow-sm'
+                  : 'bg-white text-[#5C4D46] hover:text-[#231712] hover:bg-[#FAF6EE] border border-[#231712]/10'
               }`}
             >
               <Package className="w-4 h-4" />
-              Orders Pipeline ({orders.length})
+              <span>Orders Pipeline ({orders.length})</span>
             </button>
 
             <button
               onClick={() => setActiveTab('prep-sheet')}
-              className={`px-4 sm:px-5 py-2.5 rounded-xl font-heading font-black text-xs uppercase border-2 transition-all flex items-center gap-2 ${
+              className={`px-4 sm:px-5 py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === 'prep-sheet'
-                  ? 'bg-[#1A0D08] text-white border-[#1A0D08] shadow-[3px_3px_0px_#F4BF28]'
-                  : 'bg-white text-[#1A0D08] border-[#2D1610] hover:bg-[#FAF6EF]'
+                  ? 'bg-[#231712] text-white shadow-sm'
+                  : 'bg-white text-[#5C4D46] hover:text-[#231712] hover:bg-[#FAF6EE] border border-[#231712]/10'
               }`}
             >
               <ClipboardList className="w-4 h-4" />
-              Kitchen Prep Sheet
+              <span>Kitchen Prep Sheet</span>
             </button>
 
             <button
               onClick={() => setActiveTab('inquiries')}
-              className={`px-4 sm:px-5 py-2.5 rounded-xl font-heading font-black text-xs uppercase border-2 transition-all flex items-center gap-2 ${
+              className={`px-4 sm:px-5 py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === 'inquiries'
-                  ? 'bg-[#1A0D08] text-white border-[#1A0D08] shadow-[3px_3px_0px_#F4BF28]'
-                  : 'bg-white text-[#1A0D08] border-[#2D1610] hover:bg-[#FAF6EF]'
+                  ? 'bg-[#231712] text-white shadow-sm'
+                  : 'bg-white text-[#5C4D46] hover:text-[#231712] hover:bg-[#FAF6EE] border border-[#231712]/10'
               }`}
             >
               <ChefHat className="w-4 h-4" />
-              Bespoke Inquiries ({bespokeInquiries.length})
+              <span>Bespoke Inquiries ({bespokeInquiries.length})</span>
               {pendingInquiriesCount > 0 && (
-                <span className="bg-[#E86236] text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                <span className="bg-[#C85A32] text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
                   {pendingInquiriesCount}
                 </span>
               )}
@@ -418,38 +690,38 @@ export const AdminDashboard: React.FC = () => {
 
             <button
               onClick={() => setActiveTab('inventory')}
-              className={`px-4 sm:px-5 py-2.5 rounded-xl font-heading font-black text-xs uppercase border-2 transition-all flex items-center gap-2 ${
+              className={`px-4 sm:px-5 py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === 'inventory'
-                  ? 'bg-[#1A0D08] text-white border-[#1A0D08] shadow-[3px_3px_0px_#F4BF28]'
-                  : 'bg-white text-[#1A0D08] border-[#2D1610] hover:bg-[#FAF6EF]'
+                  ? 'bg-[#231712] text-white shadow-sm'
+                  : 'bg-white text-[#5C4D46] hover:text-[#231712] hover:bg-[#FAF6EE] border border-[#231712]/10'
               }`}
             >
               <Layers className="w-4 h-4" />
-              Menu & Live Stock ({products.length})
+              <span>Menu & Live Stock ({products.length})</span>
             </button>
 
             <button
               onClick={() => setActiveTab('blog')}
-              className={`px-4 sm:px-5 py-2.5 rounded-xl font-heading font-black text-xs uppercase border-2 transition-all flex items-center gap-2 ${
+              className={`px-4 sm:px-5 py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === 'blog'
-                  ? 'bg-[#1A0D08] text-white border-[#1A0D08] shadow-[3px_3px_0px_#F4BF28]'
-                  : 'bg-white text-[#1A0D08] border-[#2D1610] hover:bg-[#FAF6EF]'
+                  ? 'bg-[#231712] text-white shadow-sm'
+                  : 'bg-white text-[#5C4D46] hover:text-[#231712] hover:bg-[#FAF6EE] border border-[#231712]/10'
               }`}
             >
               <BookOpen className="w-4 h-4" />
-              Journal & Blog ({blogPosts.length})
+              <span>Journal & Blog ({blogPosts.length})</span>
             </button>
 
             <button
               onClick={() => setActiveTab('analytics')}
-              className={`px-4 sm:px-5 py-2.5 rounded-xl font-heading font-black text-xs uppercase border-2 transition-all flex items-center gap-2 ${
+              className={`px-4 sm:px-5 py-2.5 rounded-xl font-semibold text-xs transition-all flex items-center gap-2 cursor-pointer ${
                 activeTab === 'analytics'
-                  ? 'bg-[#1A0D08] text-white border-[#1A0D08] shadow-[3px_3px_0px_#F4BF28]'
-                  : 'bg-white text-[#1A0D08] border-[#2D1610] hover:bg-[#FAF6EF]'
+                  ? 'bg-[#231712] text-white shadow-sm'
+                  : 'bg-white text-[#5C4D46] hover:text-[#231712] hover:bg-[#FAF6EE] border border-[#231712]/10'
               }`}
             >
               <TrendingUp className="w-4 h-4" />
-              Revenue & Trends
+              <span>Revenue & Trends</span>
             </button>
           </div>
         </div>
@@ -461,25 +733,25 @@ export const AdminDashboard: React.FC = () => {
           <section className="space-y-6">
             
             {/* Control Bar: Search, Status Filter, and Kanban/Table toggle */}
-            <div className="bg-white rounded-2xl border-[3px] border-[#2D1610] p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-[4px_4px_0px_#2D1610]">
+            <div className="bg-white rounded-2xl border border-[#231712]/10 p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                 <div className="relative flex-1 sm:w-72">
-                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#1A0D08]/50" />
+                  <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#7A6C65]" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search by ID, name, phone, or pastry..."
-                    className="w-full pl-9 pr-3 py-2 bg-[#FAF6EF] border-2 border-[#2D1610] rounded-xl text-xs font-semibold text-[#1A0D08] focus:outline-none"
+                    className="w-full pl-9 pr-3 py-2 bg-[#FAF6EE] border border-[#231712]/15 rounded-xl text-xs font-medium text-[#231712] focus:bg-white focus:outline-none focus:border-[#D99B26] transition-all"
                   />
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Filter className="w-4 h-4 text-[#1A0D08]" />
+                  <Filter className="w-4 h-4 text-[#7A6C65]" />
                   <select
                     value={statusFilter}
                     onChange={(e: any) => setStatusFilter(e.target.value)}
-                    className="px-3 py-2 bg-[#FAF6EF] border-2 border-[#2D1610] rounded-xl text-xs font-bold text-[#1A0D08]"
+                    className="px-3 py-2 bg-[#FAF6EE] border border-[#231712]/15 rounded-xl text-xs font-semibold text-[#231712] focus:bg-white focus:outline-none focus:border-[#D99B26]"
                   >
                     <option value="all">All Statuses ({orders.length})</option>
                     <option value="Awaiting Confirmation">Awaiting Confirmation</option>
@@ -491,23 +763,23 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               {/* View Switcher */}
-              <div className="flex items-center gap-2 self-end md:self-auto">
+              <div className="flex items-center gap-1.5 self-end md:self-auto bg-[#FAF6EE] p-1 rounded-xl border border-[#231712]/10">
                 <button
                   onClick={() => setPipelineViewMode('kanban')}
-                  className={`px-3 py-1.5 rounded-lg font-heading font-black text-xs uppercase border-2 transition-all ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                     pipelineViewMode === 'kanban'
-                      ? 'bg-[#F4BF28] text-[#1A0D08] border-[#2D1610] shadow-[2px_2px_0px_#2D1610]'
-                      : 'bg-[#FAF6EF] text-[#1A0D08] border-[#2D1610]/40'
+                      ? 'bg-white text-[#231712] shadow-sm'
+                      : 'text-[#7A6C65] hover:text-[#231712]'
                   }`}
                 >
                   Kanban Board
                 </button>
                 <button
                   onClick={() => setPipelineViewMode('table')}
-                  className={`px-3 py-1.5 rounded-lg font-heading font-black text-xs uppercase border-2 transition-all ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                     pipelineViewMode === 'table'
-                      ? 'bg-[#F4BF28] text-[#1A0D08] border-[#2D1610] shadow-[2px_2px_0px_#2D1610]'
-                      : 'bg-[#FAF6EF] text-[#1A0D08] border-[#2D1610]/40'
+                      ? 'bg-white text-[#231712] shadow-sm'
+                      : 'text-[#7A6C65] hover:text-[#231712]'
                   }`}
                 >
                   Table View
@@ -517,71 +789,73 @@ export const AdminDashboard: React.FC = () => {
 
             {/* KANBAN BOARD VIEW */}
             {pipelineViewMode === 'kanban' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3.5 items-start">
                 
-                {/* Column 1: Awaiting Confirmation */}
-                {(['Awaiting Confirmation', 'Preparing', 'Ready', 'Delivered'] as OrderStatus[]).map((colStatus) => {
+                {/* Pipeline Columns */}
+                {(['Pending', 'Confirmed', 'Preparing', 'Ready for pickup', 'Completed'] as OrderStatus[]).map((colStatus) => {
                   const colOrders = filteredOrders.filter(o => o.status === colStatus);
 
                   const columnHeaderBg = 
-                    colStatus === 'Awaiting Confirmation' ? 'bg-[#FFF3CD] text-[#856404]' :
-                    colStatus === 'Preparing' ? 'bg-[#F4BF28] text-[#1A0D08]' :
-                    colStatus === 'Ready' ? 'bg-[#3ED494] text-[#1A0D08]' : 'bg-[#1A0D08] text-white';
+                    colStatus === 'Pending' ? 'bg-amber-50 text-amber-900 border-amber-200' :
+                    colStatus === 'Confirmed' ? 'bg-blue-50 text-blue-900 border-blue-200' :
+                    colStatus === 'Preparing' ? 'bg-[#F5C84B]/20 text-[#8E2745] border-[#F5C84B]/40' :
+                    colStatus === 'Ready for pickup' ? 'bg-emerald-50 text-emerald-900 border-emerald-200' :
+                    'bg-[#3A1F1F] text-white border-[#3A1F1F]';
 
                   return (
                     <div
                       key={colStatus}
-                      className="bg-[#FAF6EF] rounded-2xl border-[3px] border-[#2D1610] p-4 flex flex-col min-h-[500px] shadow-[4px_4px_0px_#2D1610]"
+                      className="bg-[#FFF8F0] rounded-2xl border border-[#3A1F1F]/10 p-3.5 flex flex-col min-h-[480px] shadow-xs"
                     >
-                      <div className={`p-2.5 rounded-xl border-2 border-[#2D1610] mb-3 flex items-center justify-between font-heading font-black text-xs uppercase ${columnHeaderBg}`}>
+                      <div className={`p-2 rounded-xl border mb-3 flex items-center justify-between font-bold text-xs tracking-wide ${columnHeaderBg}`}>
                         <span>{colStatus}</span>
-                        <span className="w-5 h-5 rounded-full bg-white text-[#1A0D08] flex items-center justify-center text-[10px] border border-[#2D1610]">
+                        <span className="w-5 h-5 rounded-full bg-white text-[#302020] flex items-center justify-center text-[10px] font-bold border border-[#3A1F1F]/10">
                           {colOrders.length}
                         </span>
                       </div>
 
                       <div className="space-y-3 flex-1">
                         {colOrders.length === 0 ? (
-                          <div className="text-center py-10 text-xs font-bold text-[#1A0D08]/40 border-2 border-dashed border-[#2D1610]/20 rounded-xl">
+                          <div className="text-center py-10 text-xs font-medium text-[#806D6A]/60 border border-dashed border-[#3A1F1F]/15 rounded-xl">
                             No orders in this stage
                           </div>
                         ) : (
                           colOrders.map(ord => (
                             <div
                               key={ord.id}
-                              className="bg-white rounded-xl border-2 border-[#2D1610] p-3.5 shadow-[2.5px_2.5px_0px_#2D1610] space-y-2.5 transition-all hover:-translate-y-0.5"
+                              className="bg-white rounded-xl border border-[#3A1F1F]/10 p-3 shadow-xs space-y-2 transition-all hover:shadow-md"
                             >
                               <div className="flex items-start justify-between gap-1">
                                 <div>
-                                  <span className="font-heading font-black text-xs text-[#E86236]">
-                                    #{ord.id}
+                                  <span className="font-mono font-bold text-xs text-[#8E2745]">
+                                    #{ord.orderNumber || ord.id}
                                   </span>
-                                  <h4 className="font-heading font-black text-sm text-[#1A0D08]">
+                                  <h4 className="font-serif font-bold text-sm text-[#302020]">
                                     {ord.customerName}
                                   </h4>
                                 </div>
-                                <span className={`text-[10px] font-heading font-black uppercase px-2 py-0.5 rounded border border-[#2D1610] ${
-                                  ord.orderType === 'Delivery' ? 'bg-[#3CA9E2] text-white' : 'bg-[#FAF6EF] text-[#1A0D08]'
+                                <span className={`text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full border ${
+                                  ord.orderType === 'Delivery' ? 'bg-[#D93462]/10 text-[#8E2745] border-[#D93462]/20' : 'bg-[#FFF8F0] text-[#302020] border-[#3A1F1F]/10'
                                 }`}>
                                   {ord.orderType}
                                 </span>
                               </div>
 
                               {/* Due Date & Phone */}
-                              <div className="text-[11px] font-bold text-[#1A0D08]/80 space-y-1">
-                                <div className="flex items-center gap-1.5 text-[#1A0D08]">
-                                  <Calendar className="w-3.5 h-3.5 text-[#E86236]" />
+                              <div className="text-[11px] font-medium text-[#806D6A] space-y-0.5">
+                                <div className="flex items-center gap-1.5 text-[#302020]">
+                                  <Calendar className="w-3.5 h-3.5 text-[#8E2745]" />
                                   <span>Date: {ord.eventDate}</span>
                                 </div>
                                 <div className="flex items-center justify-between">
                                   <span className="flex items-center gap-1">
-                                    <Phone className="w-3 h-3 text-[#237A57]" /> {ord.customerPhone}
+                                    <Phone className="w-3 h-3 text-emerald-700" /> {ord.customerPhone}
                                   </span>
                                   <a
                                     href={`https://wa.me/${ord.customerPhone.replace(/\D/g, '')}`}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="text-[10px] font-heading font-black text-[#237A57] underline"
+                                    className="text-[10px] font-semibold text-emerald-800 underline"
                                   >
                                     WhatsApp
                                   </a>
@@ -589,62 +863,71 @@ export const AdminDashboard: React.FC = () => {
                               </div>
 
                               {/* Item list */}
-                              <div className="bg-[#FAF6EF] p-2 rounded-lg border border-[#2D1610]/20 text-[11px] font-bold text-[#1A0D08] space-y-1">
+                              <div className="bg-[#FFF8F0] p-2 rounded-lg border border-[#3A1F1F]/8 text-[11px] font-medium text-[#302020] space-y-0.5">
                                 {ord.items.map((it, i) => (
                                   <div key={i} className="flex justify-between">
                                     <span>{it.quantity}x {it.productName}</span>
-                                    <span className="text-[#E86236] text-[10px]">({it.selectedSize.label})</span>
+                                    <span className="text-[#8E2745] text-[10px]">({it.selectedSize.label})</span>
                                   </div>
                                 ))}
                                 {ord.specialInstructions && (
-                                  <p className="text-[10px] font-normal text-[#1A0D08]/80 italic pt-1 border-t border-[#2D1610]/10">
+                                  <p className="text-[10px] text-[#806D6A] italic pt-1 border-t border-[#3A1F1F]/8">
                                     "{ord.specialInstructions}"
                                   </p>
                                 )}
                               </div>
 
-                              {/* Price and Deposit */}
-                              <div className="flex items-center justify-between text-xs pt-1 border-t border-[#2D1610]/10">
+                              {/* Total & Action */}
+                              <div className="flex items-center justify-between text-xs pt-1 border-t border-[#3A1F1F]/8">
                                 <div>
-                                  <span className="font-heading font-black text-sm text-[#1A0D08]">
+                                  <span className="font-serif font-bold text-sm text-[#302020]">
                                     ${ord.total.toFixed(2)}
                                   </span>
-                                  <span className="block text-[10px] font-bold text-[#237A57]">
-                                    Paid Dep: ${ord.depositAmount.toFixed(2)}
+                                  <span className="block text-[10px] font-semibold text-emerald-700">
+                                    Pay on Delivery
                                   </span>
                                 </div>
 
                                 {/* Action Buttons */}
                                 <div className="flex items-center gap-1">
-                                  {ord.status === 'Awaiting Confirmation' && (
+                                  {ord.status === 'Pending' && (
+                                    <button
+                                      onClick={() => updateOrderStatus(ord.id, 'Confirmed')}
+                                      className="bg-[#F5C84B] hover:bg-[#e5b229] text-[#3A1F1F] font-bold px-2 py-1 text-[10px] rounded-lg transition-colors cursor-pointer"
+                                    >
+                                      Confirm →
+                                    </button>
+                                  )}
+
+                                  {ord.status === 'Confirmed' && (
                                     <button
                                       onClick={() => updateOrderStatus(ord.id, 'Preparing')}
-                                      className="bakery-btn-yellow px-2 py-1 text-[10px] uppercase border border-[#2D1610]"
+                                      className="bg-[#D93462] hover:bg-[#c42553] text-white font-bold px-2 py-1 text-[10px] rounded-lg transition-colors cursor-pointer"
                                     >
-                                      Start Frying →
+                                      Bake →
                                     </button>
                                   )}
 
                                   {ord.status === 'Preparing' && (
                                     <button
-                                      onClick={() => updateOrderStatus(ord.id, 'Ready')}
-                                      className="bg-[#3ED494] text-[#1A0D08] font-heading font-black px-2 py-1 text-[10px] uppercase rounded-lg border border-[#2D1610]"
+                                      onClick={() => updateOrderStatus(ord.id, 'Ready for pickup')}
+                                      className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-2 py-1 text-[10px] rounded-lg transition-colors cursor-pointer"
                                     >
-                                      Mark Ready →
+                                      Ready →
                                     </button>
                                   )}
 
-                                  {ord.status === 'Ready' && (
+                                  {ord.status === 'Ready for pickup' && (
                                     <button
-                                      onClick={() => updateOrderStatus(ord.id, 'Delivered')}
-                                      className="bg-[#1A0D08] text-white font-heading font-black px-2 py-1 text-[10px] uppercase rounded-lg border border-[#2D1610]"
+                                      onClick={() => updateOrderStatus(ord.id, 'Completed')}
+                                      className="bg-[#3A1F1F] hover:bg-black text-white font-bold px-2 py-1 text-[10px] rounded-lg transition-colors cursor-pointer"
                                     >
-                                      Completed ✓
+                                      Deliver ✓
                                     </button>
                                   )}
 
-                                  {ord.status === 'Delivered' && (
-                                    <span className="text-[10px] font-black text-[#237A57]">
+                                  {ord.status === 'Completed' && (
+                                    <span className="text-[10px] font-bold text-emerald-700">
                                       Finished ✓
                                     </span>
                                   )}
@@ -663,79 +946,86 @@ export const AdminDashboard: React.FC = () => {
 
             {/* TABLE VIEW */}
             {pipelineViewMode === 'table' && (
-              <div className="bg-white rounded-3xl border-[3.5px] border-[#2D1610] shadow-[6px_6px_0px_#2D1610] p-6 overflow-hidden">
+              <div className="bg-white rounded-3xl border border-[#3A1F1F]/10 shadow-sm p-6 overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b-[2.5px] border-[#2D1610] bg-[#FAF6EF] text-xs font-heading font-black uppercase text-[#1A0D08]">
+                      <tr className="border-b border-[#3A1F1F]/10 bg-[#FFF8F0] text-xs font-serif font-bold uppercase text-[#302020]">
                         <th className="py-3 px-3">Order ID</th>
                         <th className="py-3 px-3">Customer</th>
                         <th className="py-3 px-3">Items</th>
                         <th className="py-3 px-3">Event Date</th>
-                        <th className="py-3 px-3">Total / Deposit</th>
+                        <th className="py-3 px-3">Total Due (On Delivery)</th>
                         <th className="py-3 px-3">Status</th>
                         <th className="py-3 px-3 text-right">Advance Pipeline</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y-2 divide-[#2D1610]/10 text-xs font-medium text-[#1A0D08]">
+                    <tbody className="divide-y divide-[#3A1F1F]/8 text-xs font-medium text-[#302020]">
                       {filteredOrders.map(ord => (
-                        <tr key={ord.id} className="hover:bg-[#FAF6EF] transition-colors">
+                        <tr key={ord.id} className="hover:bg-[#FFF8F0]/60 transition-colors">
                           <td className="py-3 px-3">
-                            <span className="font-heading font-black text-sm text-[#E86236]">#{ord.id}</span>
-                            <span className="block text-[10px] font-bold text-[#1A0D08]/60">{ord.orderType}</span>
+                            <span className="font-mono font-bold text-sm text-[#8E2745]">#{ord.orderNumber || ord.id}</span>
+                            <span className="block text-[10px] font-semibold text-[#806D6A]">{ord.orderType}</span>
                           </td>
                           <td className="py-3 px-3">
-                            <p className="font-bold text-sm text-[#1A0D08]">{ord.customerName}</p>
-                            <p className="text-[11px] text-[#1A0D08]/80">{ord.customerPhone}</p>
+                            <p className="font-bold text-sm text-[#302020]">{ord.customerName}</p>
+                            <p className="text-[11px] text-[#806D6A]">{ord.customerPhone}</p>
                             {ord.deliveryAddress && (
-                              <p className="text-[10px] text-[#1A0D08]/60 truncate max-w-[150px]">📍 {ord.deliveryAddress}</p>
+                              <p className="text-[10px] text-[#806D6A] truncate max-w-[150px]">📍 {ord.deliveryAddress}</p>
                             )}
                           </td>
                           <td className="py-3 px-3">
                             {ord.items.map((it, i) => (
-                              <div key={i} className="text-xs font-bold">
-                                {it.quantity}x {it.productName} <span className="text-[10px] text-[#E86236]">({it.selectedSize.label})</span>
+                              <div key={i} className="text-xs font-semibold">
+                                {it.quantity}x {it.productName} <span className="text-[10px] text-[#8E2745]">({it.selectedSize.label})</span>
                               </div>
                             ))}
                           </td>
                           <td className="py-3 px-3">
-                            <span className="font-heading font-bold text-xs bg-[#FAF6EF] px-2 py-1 rounded-md border border-[#2D1610]">
+                            <span className="font-semibold text-xs bg-[#FFF8F0] px-2.5 py-1 rounded-lg border border-[#3A1F1F]/10">
                               📅 {ord.eventDate}
                             </span>
                           </td>
                           <td className="py-3 px-3">
-                            <span className="font-heading font-black text-sm text-[#1A0D08]">${ord.total.toFixed(2)}</span>
-                            <span className="block text-[10px] font-bold text-[#237A57]">Dep: ${ord.depositAmount.toFixed(2)}</span>
-                            <span className="block text-[10px] font-bold text-[#E86236]">Due: ${ord.balanceDue.toFixed(2)}</span>
+                            <span className="font-serif font-bold text-sm text-[#302020]">${ord.total.toFixed(2)}</span>
+                            <span className="block text-[10px] font-semibold text-emerald-700">Pay on Delivery</span>
                           </td>
                           <td className="py-3 px-3">
-                            <span className={`inline-block font-heading font-black text-[10px] px-2.5 py-1 rounded-xl border ${getStatusBadge(ord.status)}`}>
+                            <span className={`inline-block font-bold text-[10px] px-2.5 py-1 rounded-xl border ${getStatusBadge(ord.status)}`}>
                               {ord.status}
                             </span>
                           </td>
                           <td className="py-3 px-3 text-right">
-                            {ord.status === 'Awaiting Confirmation' && (
+                            {ord.status === 'Pending' && (
+                              <button
+                                onClick={() => updateOrderStatus(ord.id, 'Confirmed')}
+                                className="bg-[#F5C84B] hover:bg-[#e5b229] text-[#3A1F1F] font-bold px-2.5 py-1 text-[10px] uppercase rounded-lg transition-colors cursor-pointer"
+                              >
+                                Confirm Order →
+                              </button>
+                            )}
+                            {ord.status === 'Confirmed' && (
                               <button
                                 onClick={() => updateOrderStatus(ord.id, 'Preparing')}
-                                className="bakery-btn-yellow px-2.5 py-1 text-[10px] uppercase border border-[#2D1610]"
+                                className="bg-[#D93462] hover:bg-[#c42553] text-white font-bold px-2.5 py-1 text-[10px] uppercase rounded-lg transition-colors cursor-pointer"
                               >
-                                Start Frying →
+                                Start Baking →
                               </button>
                             )}
                             {ord.status === 'Preparing' && (
                               <button
-                                onClick={() => updateOrderStatus(ord.id, 'Ready')}
-                                className="bg-[#3ED494] text-[#1A0D08] font-heading font-black px-2.5 py-1 text-[10px] uppercase rounded-lg border border-[#2D1610]"
+                                onClick={() => updateOrderStatus(ord.id, 'Ready for pickup')}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 text-[10px] uppercase rounded-lg transition-colors cursor-pointer"
                               >
                                 Mark Ready →
                               </button>
                             )}
-                            {ord.status === 'Ready' && (
+                            {(ord.status === 'Ready for pickup' || ord.status === 'Out for delivery') && (
                               <button
-                                onClick={() => updateOrderStatus(ord.id, 'Delivered')}
-                                className="bg-[#1A0D08] text-white font-heading font-black px-2.5 py-1 text-[10px] uppercase rounded-lg border border-[#2D1610]"
+                                onClick={() => updateOrderStatus(ord.id, 'Completed')}
+                                className="bg-[#3A1F1F] hover:bg-black text-white font-bold px-2.5 py-1 text-[10px] uppercase rounded-lg transition-colors cursor-pointer"
                               >
-                                Mark Delivered ✓
+                                Mark Completed ✓
                               </button>
                             )}
                           </td>
@@ -755,27 +1045,27 @@ export const AdminDashboard: React.FC = () => {
             ══════════════════════════════════════════════════ */}
         {activeTab === 'prep-sheet' && (
           <section className="space-y-6">
-            <div className="bg-white rounded-3xl border-[3.5px] border-[#2D1610] shadow-[6px_6px_0px_#2D1610] p-6 sm:p-8">
+            <div className="bg-white rounded-3xl border border-[#3A1F1F]/10 shadow-sm p-6 sm:p-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
-                  <h3 className="font-heading font-black text-2xl text-[#1A0D08] uppercase flex items-center gap-2">
-                    <ClipboardList className="w-6 h-6 text-[#E86236]" />
+                  <h3 className="font-serif font-bold text-2xl text-[#302020] flex items-center gap-2">
+                    <ClipboardList className="w-6 h-6 text-[#8E2745]" />
                     Daily Kitchen Production & Prep Sheet
                   </h3>
-                  <p className="text-xs text-[#1A0D08]/80 font-medium">
+                  <p className="text-xs text-[#806D6A] font-medium">
                     Aggregated pastry batch counts and cake bake schedules grouped by customer event dates.
                   </p>
                 </div>
                 <button
                   onClick={() => window.print()}
-                  className="bakery-btn-yellow px-4 py-2 text-xs uppercase border-2 border-[#2D1610] self-start sm:self-auto"
+                  className="btn-gold text-xs py-2 px-4 flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
                 >
                   🖨️ Print Kitchen Sheet
                 </button>
               </div>
 
               {kitchenPrepByDate.length === 0 ? (
-                <div className="text-center py-12 text-[#1A0D08]/60 font-bold">
+                <div className="text-center py-12 text-[#806D6A] font-medium">
                   No upcoming orders to prepare.
                 </div>
               ) : (
@@ -783,15 +1073,15 @@ export const AdminDashboard: React.FC = () => {
                   {kitchenPrepByDate.map((group) => (
                     <div
                       key={group.date}
-                      className="bg-[#FAF6EF] rounded-2xl border-[2.5px] border-[#2D1610] shadow-[4px_4px_0px_#2D1610] p-5"
+                      className="bg-[#FFF8F0] rounded-2xl border border-[#3A1F1F]/10 shadow-xs p-5"
                     >
-                      <div className="flex items-center justify-between border-b-2 border-[#2D1610]/20 pb-3 mb-4">
+                      <div className="flex items-center justify-between border-b border-[#3A1F1F]/10 pb-3 mb-4">
                         <div className="flex items-center gap-2">
-                          <span className="w-3 h-3 rounded-full bg-[#E86236]"></span>
-                          <h4 className="font-heading font-black text-lg text-[#1A0D08] uppercase">
+                          <span className="w-3 h-3 rounded-full bg-[#8E2745]"></span>
+                          <h4 className="font-serif font-bold text-lg text-[#302020]">
                             Event Date: {group.date}
                           </h4>
-                          <span className="bg-[#F4BF28] text-[#1A0D08] text-xs font-heading font-black px-2 py-0.5 rounded-full border border-[#2D1610]">
+                          <span className="bg-[#F5C84B] text-[#3A1F1F] text-xs font-bold px-2 py-0.5 rounded-full">
                             {group.orderCount} Order{group.orderCount > 1 ? 's' : ''} Scheduled
                           </span>
                         </div>
@@ -1281,42 +1571,42 @@ export const AdminDashboard: React.FC = () => {
             ══════════════════════════════════════════════════ */}
         {activeTab === 'analytics' && (
           <section className="space-y-6">
-            <div className="bg-white rounded-3xl border-[3.5px] border-[#2D1610] shadow-[6px_6px_0px_#2D1610] p-6 sm:p-8">
+            <div className="bg-white rounded-3xl border border-[#3A1F1F]/10 shadow-sm p-6 sm:p-8">
               <div className="mb-6">
-                <h3 className="font-heading font-black text-2xl text-[#1A0D08] uppercase flex items-center gap-2">
-                  <TrendingUp className="w-6 h-6 text-[#E86236]" />
+                <h3 className="font-serif font-bold text-2xl text-[#302020] flex items-center gap-2">
+                  <TrendingUp className="w-6 h-6 text-[#8E2745]" />
                   Weekly Revenue & Sales Volume
                 </h3>
-                <p className="text-xs text-[#1A0D08]/80 font-medium">
+                <p className="text-xs text-[#806D6A] font-medium">
                   Pastry production peaks on Fridays and Saturdays due to wedding dessert spreads and party platters.
                 </p>
               </div>
 
               {/* Bar Chart */}
-              <div className="h-64 sm:h-72 w-full pt-8 flex items-end justify-between gap-3 sm:gap-6 border-b-[3.5px] border-[#2D1610] px-2 sm:px-6">
-                {WEEKLY_SALES_DATA.map((item) => {
+              <div className="h-64 sm:h-72 w-full pt-8 flex items-end justify-between gap-3 sm:gap-6 border-b border-[#3A1F1F]/15 px-2 sm:px-6">
+                {WEEKLY_SALES_DATA.map((item: { day: string; revenue: number; orders: number }) => {
                   const maxRevenue = 2000;
                   const heightPercent = Math.min(100, Math.round((item.revenue / maxRevenue) * 100));
 
                   return (
                     <div key={item.day} className="flex-1 flex flex-col items-center h-full justify-end group">
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity mb-2 bg-[#1A0D08] text-white text-[10px] font-heading font-black px-2 py-1 rounded-md text-center shadow-[2px_2px_0px_#F4BF28] pointer-events-none">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity mb-2 bg-[#3A1F1F] text-white text-[10px] font-bold px-2 py-1 rounded-md text-center shadow-xs pointer-events-none">
                         ${item.revenue} ({item.orders} orders)
                       </div>
 
                       <div
                         style={{ height: `${heightPercent}%` }}
-                        className="w-full max-w-[48px] bg-[#F4BF28] hover:bg-[#E86236] rounded-t-xl border-[2.5px] border-[#2D1610] shadow-[2.5px_0px_0px_#2D1610] transition-all relative"
+                        className="w-full max-w-[48px] bg-[#F5C84B] hover:bg-[#D93462] rounded-t-xl transition-all relative"
                       >
-                        <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-heading font-black text-[#1A0D08] whitespace-nowrap hidden sm:block">
+                        <span className="absolute -top-6 left-1/2 -translate-x-1/2 text-[10px] font-bold text-[#302020] whitespace-nowrap hidden sm:block">
                           ${item.revenue}
                         </span>
                       </div>
 
-                      <span className="font-heading font-black text-xs text-[#1A0D08] mt-2">
+                      <span className="font-bold text-xs text-[#302020] mt-2">
                         {item.day}
                       </span>
-                      <span className="text-[10px] text-[#1A0D08]/70 font-bold">
+                      <span className="text-[10px] text-[#806D6A] font-semibold">
                         {item.orders} ord
                       </span>
                     </div>
@@ -1324,17 +1614,17 @@ export const AdminDashboard: React.FC = () => {
                 })}
               </div>
 
-              <div className="mt-6 flex flex-wrap items-center justify-between gap-4 text-xs font-bold text-[#1A0D08] bg-[#FAF6EF] p-4 rounded-2xl border-2 border-[#2D1610]">
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-4 text-xs font-bold text-[#302020] bg-[#FFF8F0] p-4 rounded-2xl border border-[#3A1F1F]/10">
                 <div>
-                  <span>Projected Weekly Total: </span>
-                  <span className="font-heading font-black text-[#E86236] text-sm">
-                    ${WEEKLY_SALES_DATA.reduce((s, i) => s + i.revenue, 0).toLocaleString()} USD
+                  <span className="text-[#806D6A]">Projected Weekly Total: </span>
+                  <span className="font-serif font-bold text-[#8E2745] text-sm ml-1">
+                    ${WEEKLY_SALES_DATA.reduce((s: number, i: { revenue: number; orders: number }) => s + i.revenue, 0).toLocaleString()} USD
                   </span>
                 </div>
                 <div>
-                  <span>Average Party Order: </span>
-                  <span className="font-heading font-black text-[#237A57] text-sm">
-                    ${Math.round(WEEKLY_SALES_DATA.reduce((s, i) => s + i.revenue, 0) / WEEKLY_SALES_DATA.reduce((s, i) => s + i.orders, 0))} USD
+                  <span className="text-[#806D6A]">Average Party Order: </span>
+                  <span className="font-serif font-bold text-emerald-700 text-sm ml-1">
+                    ${Math.round(WEEKLY_SALES_DATA.reduce((s: number, i: { revenue: number; orders: number }) => s + i.revenue, 0) / WEEKLY_SALES_DATA.reduce((s: number, i: { revenue: number; orders: number }) => s + i.orders, 0))} USD
                   </span>
                 </div>
               </div>

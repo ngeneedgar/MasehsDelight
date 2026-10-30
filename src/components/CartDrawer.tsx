@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useBakery } from '../context/BakeryContext';
-import { ShoppingBag, Trash2, Plus, Minus, Calendar, MapPin, AlertTriangle, ShieldCheck, ArrowRight, X, Sparkles, Truck } from 'lucide-react';
+import { ShoppingBag, Trash2, Plus, Minus, Calendar, MapPin, ShieldCheck, ArrowRight, X, Clock, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export const CartDrawer: React.FC = () => {
@@ -12,23 +12,27 @@ export const CartDrawer: React.FC = () => {
     setIsCartOpen,
     removeFromCart,
     updateCartQuantity,
-    createOrder
+    createOrder,
+    setCurrentView
   } = useBakery();
 
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   // Form states
-  const [orderType, setOrderType] = useState<'Pickup' | 'Delivery'>('Pickup');
+  const [orderType, setOrderType] = useState<'Pickup' | 'Delivery'>('Delivery');
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [cityState, setCityState] = useState('Bowie, MD');
+  const [zipCode, setZipCode] = useState('');
+  const [preferredTime, setPreferredTime] = useState('12:00 PM – 2:00 PM');
   const [specialInstructions, setSpecialInstructions] = useState('');
 
-  // 3-day minimum lead time computation
+  // Minimum lead time (at least 2 days ahead)
   const getMinDate = () => {
     const d = new Date();
-    d.setDate(d.getDate() + 3);
+    d.setDate(d.getDate() + 2);
     return d.toISOString().split('T')[0];
   };
 
@@ -38,21 +42,15 @@ export const CartDrawer: React.FC = () => {
   const [allergies, setAllergies] = useState<string[]>([]);
   const allergyOptions = ['Gluten / Wheat', 'Dairy / Milk', 'Eggs', 'Tree Nuts / Peanuts', 'Fish / Seafood'];
 
-  // Terms acceptance
-  const [agreedToDeposit, setAgreedToDeposit] = useState(false);
+  // Agreements
+  const [agreedToPaymentOnDelivery, setAgreedToPaymentOnDelivery] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  // Free delivery threshold: $100
-  const isFreeDeliveryQualified = cartTotal >= 100;
-  const deliveryFee = orderType === 'Delivery' ? (isFreeDeliveryQualified ? 0 : 15) : 0;
+  // Delivery fee
+  const deliveryFee = orderType === 'Delivery' ? 15.0 : 0.0;
   const grandTotal = cartTotal + deliveryFee;
-  const depositNow = Number((grandTotal * 0.5).toFixed(2));
-  const balanceLater = Number((grandTotal - depositNow).toFixed(2));
-
-  // Progress to free delivery calculation
-  const freeDeliveryThreshold = 100;
-  const amountNeeded = Math.max(0, freeDeliveryThreshold - cartTotal);
-  const deliveryProgressPercent = Math.min(100, Math.round((cartTotal / freeDeliveryThreshold) * 100));
 
   const toggleAllergy = (item: string) => {
     setAllergies(prev =>
@@ -60,283 +58,244 @@ export const CartDrawer: React.FC = () => {
     );
   };
 
-  const handleCheckoutSubmit = (e: React.FormEvent) => {
+  const handleCheckoutSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage('');
 
-    if (!customerName.trim() || !customerPhone.trim()) {
-      alert('Please fill in your name and phone number.');
+    if (!customerName.trim() || !customerPhone.trim() || !customerEmail.trim()) {
+      setErrorMessage('Please fill in your full name, phone number, and email address.');
       return;
     }
 
     if (orderType === 'Delivery' && !deliveryAddress.trim()) {
-      alert('Please provide a delivery address.');
+      setErrorMessage('Please provide your street delivery address.');
       return;
     }
 
-    if (!agreedToDeposit || !agreedToTerms) {
-      alert('Please accept the 50% deposit and bakery terms to confirm.');
+    if (!agreedToPaymentOnDelivery) {
+      setErrorMessage('Please confirm that you understand payment will be collected upon delivery or pickup.');
       return;
     }
 
-    createOrder({
-      customerName: customerName.trim(),
-      customerPhone: customerPhone.trim(),
-      customerEmail: customerEmail.trim() || 'customer@masehsdelight.com',
-      orderType,
-      deliveryAddress: orderType === 'Delivery' ? deliveryAddress.trim() : undefined,
-      eventDate,
-      allergies,
-      specialInstructions: specialInstructions.trim(),
-      deliveryFee
-    });
+    if (!agreedToTerms) {
+      setErrorMessage('Please agree to the ordering terms and conditions.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await createOrder({
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        customerEmail: customerEmail.trim().toLowerCase(),
+        orderType,
+        deliveryAddress: orderType === 'Delivery' ? deliveryAddress.trim() : undefined,
+        cityState: orderType === 'Delivery' ? cityState.trim() : undefined,
+        zipCode: orderType === 'Delivery' ? zipCode.trim() : undefined,
+        eventDate,
+        preferredTime,
+        allergies,
+        specialInstructions: specialInstructions.trim(),
+        deliveryFee,
+        paymentTermsAgreed: true
+      });
+      setIsCheckingOut(false);
+    } catch (err: any) {
+      setErrorMessage('Failed to place order. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <AnimatePresence>
       {isCartOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden">
-          {/* Backdrop with fade */}
+          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
             onClick={() => setIsCartOpen(false)}
-            className="absolute inset-0 bg-[#231712]/45 backdrop-blur-xs transition-opacity"
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
           />
 
-          <div className="fixed inset-y-0 right-0 max-w-full flex pl-6 sm:pl-10">
-            {/* Slide-out drawer with Framer Motion */}
+          <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
             <motion.div
               initial={{ x: '100%' }}
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="w-screen max-w-md bg-[#FAF6EE] shadow-2xl border-l border-[#231712]/10 flex flex-col"
+              transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+              className="w-screen max-w-md bg-[#FFF8F0] shadow-2xl flex flex-col border-l border-[#3A1F1F]/10"
             >
               {/* Header */}
-              <div className="p-4 sm:p-5 bg-[#231712] text-white flex items-center justify-between shadow-xs">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-[#D99B26] flex items-center justify-center text-white">
-                    <ShoppingBag className="w-4 h-4" />
+              <div className="p-4 sm:p-6 bg-white border-b border-[#3A1F1F]/10 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-[#FFF0F4] text-[#D93462] flex items-center justify-center">
+                    <ShoppingBag className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-serif text-lg font-bold text-white leading-none">
-                      {isCheckingOut ? 'Confirm Order' : 'Your Pastry Basket'}
-                    </h3>
-                    <p className="text-[11px] text-[#D99B26] font-accent font-semibold mt-0.5">
-                      {cartCount} item(s) • Handcrafted in Maryland
+                    <h2 className="font-serif text-lg sm:text-xl font-bold text-[#302020]">
+                      {isCheckingOut ? 'Checkout Order' : 'Your Treats Cart'}
+                    </h2>
+                    <p className="text-xs text-[#806D6A]">
+                      {cartCount} {cartCount === 1 ? 'item' : 'items'} • Payment on Delivery
                     </p>
                   </div>
                 </div>
 
                 <button
-                  onClick={() => setIsCartOpen(false)}
-                  className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition-colors cursor-pointer"
-                  aria-label="Close cart drawer"
+                  onClick={() => {
+                    setIsCartOpen(false);
+                    setIsCheckingOut(false);
+                  }}
+                  className="w-8 h-8 rounded-full bg-[#FFF8F0] hover:bg-[#3A1F1F]/10 flex items-center justify-center text-[#302020] transition-colors cursor-pointer"
+                  aria-label="Close cart"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
-              {/* ══════════════════════════════════════════════════
-                  FREE DMV COURIER DELIVERY PROGRESS BAR
-                  ══════════════════════════════════════════════════ */}
-              <div className="bg-white px-5 py-3 border-b border-[#231712]/8 shadow-xs">
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="font-accent font-semibold text-[#231712] flex items-center gap-1.5">
-                    <Truck className="w-3.5 h-3.5 text-[#C85A32]" />
-                    {isFreeDeliveryQualified ? (
-                      <span className="text-emerald-700 font-bold">Free DMV Delivery Unlocked!</span>
-                    ) : (
-                      <span>
-                        Add <strong className="text-[#C85A32]">${amountNeeded.toFixed(2)}</strong> for Free DMV Delivery
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-[11px] font-bold text-[#7A6C65]">
-                    {deliveryProgressPercent}%
-                  </span>
-                </div>
-
-                {/* Animated fill track */}
-                <div className="w-full h-2 rounded-full bg-[#FAF6EE] overflow-hidden border border-[#231712]/10">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${deliveryProgressPercent}%` }}
-                    transition={{ duration: 0.6, ease: 'easeOut' }}
-                    className={`h-full rounded-full transition-all ${
-                      isFreeDeliveryQualified
-                        ? 'bg-emerald-500'
-                        : 'bg-gradient-to-r from-[#D99B26] to-[#C85A32]'
-                    }`}
-                  />
-                </div>
+              {/* PAYMENT ON DELIVERY BANNER */}
+              <div className="bg-[#3A1F1F] text-white px-4 py-2.5 flex items-center gap-2 text-xs">
+                <ShieldCheck className="w-4 h-4 text-[#F5C84B] flex-shrink-0" />
+                <span className="font-medium text-white/95">
+                  <strong className="text-[#F5C84B]">Payment on Delivery:</strong> No card needed today. Pay when treats arrive!
+                </span>
               </div>
 
-              {/* Body Content */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
-                
-                {!isCheckingOut ? (
-                  /* Step 1: Cart Items List */
-                  <>
-                    {cart.length === 0 ? (
-                      <div className="text-center py-16 space-y-3">
-                        <div className="w-14 h-14 mx-auto rounded-full bg-[#FBF2DE] text-[#D99B26] flex items-center justify-center">
-                          <ShoppingBag className="w-7 h-7" />
-                        </div>
-                        <h4 className="font-serif text-lg font-bold text-[#231712]">
-                          Your basket is empty
-                        </h4>
-                        <p className="text-xs text-[#7A6C65] max-w-xs mx-auto">
-                          Treat yourself to warm pillowy puff-puff, crunchy chin-chin, or bespoke celebration tiers.
-                        </p>
-                        <button
-                          onClick={() => setIsCartOpen(false)}
-                          className="btn-primary text-xs py-2 px-5 mt-2"
-                        >
-                          Browse Bakery Menu
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {cart.map((item) => (
-                          <div
-                            key={item.id}
-                            className="bg-white rounded-xl border border-[#231712]/8 p-3.5 flex flex-col gap-2 shadow-xs"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              {item.imageUrl && (
-                                <img
-                                  src={item.imageUrl}
-                                  alt={item.productName}
-                                  className="w-14 h-14 rounded-lg object-cover bg-[#FAF6EE] flex-shrink-0"
-                                />
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <h4 className="font-serif text-sm font-bold text-[#231712] leading-snug">
-                                  {item.productName}
-                                </h4>
-                                <p className="text-xs text-[#C85A32] font-semibold mt-0.5">
-                                  {item.selectedSize.label}
-                                </p>
-                                <p className="text-[11px] text-[#7A6C65]">
-                                  {item.selectedSize.piecesCount || item.selectedSize.description}
-                                </p>
-                              </div>
-
+              {/* Main Body */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+                {cart.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4">
+                    <div className="w-16 h-16 rounded-full bg-white border border-[#3A1F1F]/10 flex items-center justify-center text-[#806D6A] shadow-xs">
+                      <ShoppingBag className="w-8 h-8 text-[#D93462]" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="font-serif text-xl font-bold text-[#302020]">Your cart is empty</h3>
+                      <p className="text-xs text-[#806D6A] max-w-xs">
+                        Treat yourself or your guests to authentic puff puff, crispy chin chin, fish rolls, and custom celebration cakes!
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setIsCartOpen(false);
+                        setCurrentView('shop');
+                      }}
+                      className="btn-primary text-xs py-2.5 px-6"
+                    >
+                      Browse Our Menu
+                    </button>
+                  </div>
+                ) : !isCheckingOut ? (
+                  /* CART ITEMS LIST */
+                  <div className="space-y-3">
+                    {cart.map((item) => (
+                      <div
+                        key={item.id}
+                        className="bg-white rounded-2xl p-3.5 border border-[#3A1F1F]/10 shadow-xs flex gap-3 relative"
+                      >
+                        {item.imageUrl && (
+                          <img
+                            src={item.imageUrl}
+                            alt={item.productName}
+                            className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
+                          />
+                        )}
+                        <div className="flex-1 min-w-0 pr-6">
+                          <h4 className="font-serif text-sm font-bold text-[#302020] truncate">
+                            {item.productName}
+                          </h4>
+                          <p className="text-xs text-[#8E2745] font-semibold">
+                            {item.selectedSize.label}
+                          </p>
+                          {item.cakeDetails && (
+                            <p className="text-[11px] text-[#806D6A] truncate">
+                              Flavor: {item.cakeDetails.flavor}
+                            </p>
+                          )}
+                          <div className="flex items-center justify-between mt-2">
+                            <div className="flex items-center border border-[#3A1F1F]/15 rounded-lg overflow-hidden bg-[#FFF8F0]">
                               <button
-                                onClick={() => removeFromCart(item.id)}
-                                className="text-[#7A6C65] hover:text-red-500 p-1 transition-colors cursor-pointer"
-                                title="Remove item"
+                                onClick={() => updateCartQuantity(item.id, -1)}
+                                className="p-1 hover:bg-white text-[#302020] cursor-pointer"
+                                aria-label="Decrease"
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <span className="px-2.5 text-xs font-bold text-[#302020]">
+                                {item.quantity}
+                              </span>
+                              <button
+                                onClick={() => updateCartQuantity(item.id, 1)}
+                                className="p-1 hover:bg-white text-[#302020] cursor-pointer"
+                                aria-label="Increase"
+                              >
+                                <Plus className="w-3 h-3" />
                               </button>
                             </div>
-
-                            <div className="flex items-center justify-between pt-2 border-t border-[#231712]/6">
-                              {/* Quantity stepper */}
-                              <div className="flex items-center border border-[#231712]/15 rounded-lg overflow-hidden bg-[#FAF6EE]">
-                                <button
-                                  onClick={() => updateCartQuantity(item.id, -1)}
-                                  className="px-2.5 py-1 text-xs hover:bg-white text-[#231712] transition-colors cursor-pointer"
-                                >
-                                  -
-                                </button>
-                                <span className="px-2.5 py-1 text-xs font-bold text-[#231712]">
-                                  {item.quantity}
-                                </span>
-                                <button
-                                  onClick={() => updateCartQuantity(item.id, 1)}
-                                  className="px-2.5 py-1 text-xs hover:bg-white text-[#231712] transition-colors cursor-pointer"
-                                >
-                                  +
-                                </button>
-                              </div>
-
-                              <div className="text-right">
-                                <span className="font-serif text-sm font-bold text-[#231712]">
-                                  ${(item.selectedSize.price * item.quantity).toFixed(2)}
-                                </span>
-                              </div>
-                            </div>
+                            <span className="font-serif text-sm font-bold text-[#302020]">
+                              ${(item.selectedSize.price * item.quantity).toFixed(2)}
+                            </span>
                           </div>
-                        ))}
+                        </div>
+
+                        {/* Delete item button */}
+                        <button
+                          onClick={() => removeFromCart(item.id)}
+                          className="absolute top-3 right-3 text-[#806D6A] hover:text-[#D93462] transition-colors p-1"
+                          aria-label="Remove item"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  /* CHECKOUT FORM */
+                  <form id="checkout-form" onSubmit={handleCheckoutSubmit} className="space-y-4">
+                    {errorMessage && (
+                      <div className="p-3 bg-red-50 text-red-700 text-xs rounded-xl border border-red-200 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                        <span>{errorMessage}</span>
                       </div>
                     )}
-                  </>
-                ) : (
-                  /* Step 2: Checkout Form */
-                  <form id="checkout-form" onSubmit={handleCheckoutSubmit} className="space-y-4">
-                    
-                    {/* Pickup or Delivery Toggle */}
-                    <div className="bg-white p-3.5 rounded-xl border border-[#231712]/8 shadow-xs">
-                      <label className="block text-xs font-accent font-bold uppercase tracking-wider text-[#231712] mb-2">
+
+                    {/* Order Type Toggle */}
+                    <div>
+                      <label className="block text-xs font-bold text-[#302020] uppercase tracking-wider mb-1.5">
                         Fulfillment Method
                       </label>
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           type="button"
-                          onClick={() => setOrderType('Pickup')}
-                          className={`py-2 px-3 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
-                            orderType === 'Pickup'
-                              ? 'bg-[#231712] text-white border-[#231712]'
-                              : 'bg-[#FAF6EE] text-[#4A3E39] border-[#231712]/15 hover:border-[#231712]'
+                          onClick={() => setOrderType('Delivery')}
+                          className={`py-2 px-3 rounded-xl text-xs font-bold border-2 transition-all cursor-pointer ${
+                            orderType === 'Delivery'
+                              ? 'border-[#D93462] bg-[#FFF0F4] text-[#8E2745]'
+                              : 'border-[#3A1F1F]/15 bg-white text-[#302020]'
                           }`}
                         >
-                          Pickup (Free)
+                          🚚 Local Delivery (+$15)
                         </button>
                         <button
                           type="button"
-                          onClick={() => setOrderType('Delivery')}
-                          className={`py-2 px-3 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
-                            orderType === 'Delivery'
-                              ? 'bg-[#231712] text-white border-[#231712]'
-                              : 'bg-[#FAF6EE] text-[#4A3E39] border-[#231712]/15 hover:border-[#231712]'
+                          onClick={() => setOrderType('Pickup')}
+                          className={`py-2 px-3 rounded-xl text-xs font-bold border-2 transition-all cursor-pointer ${
+                            orderType === 'Pickup'
+                              ? 'border-[#D93462] bg-[#FFF0F4] text-[#8E2745]'
+                              : 'border-[#3A1F1F]/15 bg-white text-[#302020]'
                           }`}
                         >
-                          Courier Delivery {isFreeDeliveryQualified ? '(FREE 🎉)' : '(+$15.00)'}
+                          📍 Bakery Pickup (Free)
                         </button>
                       </div>
-                      {orderType === 'Pickup' ? (
-                        <p className="text-[11px] text-[#7A6C65] mt-2">
-                          Pickup location: Silver Spring / DMV Metro Area, Maryland. Exact address provided upon confirmation.
-                        </p>
-                      ) : (
-                        <p className="text-[11px] text-[#7A6C65] mt-2">
-                          Local doorstep courier across Maryland, Washington DC, and Northern Virginia.
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Event / Pickup Date (3-Day Minimum Enforced!) */}
-                    <div className="bg-white p-3.5 rounded-xl border border-[#231712]/8 shadow-xs space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-accent font-bold uppercase tracking-wider text-[#231712] flex items-center gap-1.5">
-                          <Calendar className="w-3.5 h-3.5 text-[#C85A32]" />
-                          Date Needed *
-                        </label>
-                        <span className="text-[10px] font-accent font-bold text-[#C85A32] bg-[#F9EBE6] px-2 py-0.5 rounded">
-                          3-Day Notice Required
-                        </span>
-                      </div>
-                      <input
-                        type="date"
-                        required
-                        min={getMinDate()}
-                        value={eventDate}
-                        onChange={(e) => setEventDate(e.target.value)}
-                        className="w-full px-3 py-2 bg-[#FAF6EE] border border-[#231712]/15 rounded-lg text-xs text-[#231712] focus:outline-none focus:border-[#D99B26]"
-                      />
-                      <p className="text-[10px] text-[#7A6C65]">
-                        Because our dough is slow-proofed fresh from scratch, dates earlier than 3 days are blocked.
-                      </p>
                     </div>
 
                     {/* Customer Details */}
                     <div className="space-y-2.5">
                       <div>
-                        <label className="block text-[11px] font-accent font-bold uppercase text-[#231712] mb-1">
+                        <label className="block text-[11px] font-bold text-[#302020] mb-1">
                           Full Name *
                         </label>
                         <input
@@ -344,203 +303,245 @@ export const CartDrawer: React.FC = () => {
                           required
                           value={customerName}
                           onChange={(e) => setCustomerName(e.target.value)}
-                          placeholder="e.g. Jessica Mensah"
-                          className="w-full px-3 py-2 bg-white border border-[#231712]/15 rounded-lg text-xs text-[#231712] focus:outline-none focus:border-[#D99B26]"
+                          placeholder="e.g. Chinelo Okonkwo"
+                          className="w-full px-3 py-2 bg-white rounded-xl border border-[#3A1F1F]/15 text-xs text-[#302020] focus:ring-2 focus:ring-[#D93462]"
                         />
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-[11px] font-accent font-bold uppercase text-[#231712] mb-1">
-                            Phone (WhatsApp) *
+                          <label className="block text-[11px] font-bold text-[#302020] mb-1">
+                            Phone Number *
                           </label>
                           <input
                             type="tel"
                             required
                             value={customerPhone}
                             onChange={(e) => setCustomerPhone(e.target.value)}
-                            placeholder="+1 (240)..."
-                            className="w-full px-3 py-2 bg-white border border-[#231712]/15 rounded-lg text-xs text-[#231712] focus:outline-none focus:border-[#D99B26]"
+                            placeholder="+1 (240) 555-0199"
+                            className="w-full px-3 py-2 bg-white rounded-xl border border-[#3A1F1F]/15 text-xs text-[#302020] focus:ring-2 focus:ring-[#D93462]"
                           />
                         </div>
                         <div>
-                          <label className="block text-[11px] font-accent font-bold uppercase text-[#231712] mb-1">
-                            Email
+                          <label className="block text-[11px] font-bold text-[#302020] mb-1">
+                            Email Address *
                           </label>
                           <input
                             type="email"
+                            required
                             value={customerEmail}
                             onChange={(e) => setCustomerEmail(e.target.value)}
-                            placeholder="you@email.com"
-                            className="w-full px-3 py-2 bg-white border border-[#231712]/15 rounded-lg text-xs text-[#231712] focus:outline-none focus:border-[#D99B26]"
+                            placeholder="you@example.com"
+                            className="w-full px-3 py-2 bg-white rounded-xl border border-[#3A1F1F]/15 text-xs text-[#302020] focus:ring-2 focus:ring-[#D93462]"
                           />
                         </div>
                       </div>
 
                       {orderType === 'Delivery' && (
+                        <div className="space-y-2">
+                          <div>
+                            <label className="block text-[11px] font-bold text-[#302020] mb-1">
+                              Street Delivery Address *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={deliveryAddress}
+                              onChange={(e) => setDeliveryAddress(e.target.value)}
+                              placeholder="e.g. 14208 Lake Pleasant Dr, Apt 2B"
+                              className="w-full px-3 py-2 bg-white rounded-xl border border-[#3A1F1F]/15 text-xs text-[#302020] focus:ring-2 focus:ring-[#D93462]"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[11px] font-bold text-[#302020] mb-1">
+                                City / State
+                              </label>
+                              <input
+                                type="text"
+                                value={cityState}
+                                onChange={(e) => setCityState(e.target.value)}
+                                className="w-full px-3 py-2 bg-white rounded-xl border border-[#3A1F1F]/15 text-xs text-[#302020]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-bold text-[#302020] mb-1">
+                                Zip Code
+                              </label>
+                              <input
+                                type="text"
+                                value={zipCode}
+                                onChange={(e) => setZipCode(e.target.value)}
+                                placeholder="20720"
+                                className="w-full px-3 py-2 bg-white rounded-xl border border-[#3A1F1F]/15 text-xs text-[#302020]"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Date & Time */}
+                      <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-[11px] font-accent font-bold uppercase text-[#231712] mb-1">
-                            Delivery Address *
+                          <label className="block text-[11px] font-bold text-[#302020] mb-1">
+                            Preferred Date *
                           </label>
                           <input
-                            type="text"
+                            type="date"
                             required
-                            value={deliveryAddress}
-                            onChange={(e) => setDeliveryAddress(e.target.value)}
-                            placeholder="Street, City, State, ZIP"
-                            className="w-full px-3 py-2 bg-white border border-[#231712]/15 rounded-lg text-xs text-[#231712] focus:outline-none focus:border-[#D99B26]"
+                            min={getMinDate()}
+                            value={eventDate}
+                            onChange={(e) => setEventDate(e.target.value)}
+                            className="w-full px-3 py-2 bg-white rounded-xl border border-[#3A1F1F]/15 text-xs text-[#302020]"
                           />
                         </div>
-                      )}
+                        <div>
+                          <label className="block text-[11px] font-bold text-[#302020] mb-1">
+                            Time Window
+                          </label>
+                          <select
+                            value={preferredTime}
+                            onChange={(e) => setPreferredTime(e.target.value)}
+                            className="w-full px-3 py-2 bg-white rounded-xl border border-[#3A1F1F]/15 text-xs text-[#302020]"
+                          >
+                            <option>10:00 AM – 12:00 PM</option>
+                            <option>12:00 PM – 2:00 PM</option>
+                            <option>2:00 PM – 5:00 PM</option>
+                            <option>5:00 PM – 7:00 PM</option>
+                          </select>
+                        </div>
+                      </div>
 
+                      {/* Allergy info */}
                       <div>
-                        <label className="block text-[11px] font-accent font-bold uppercase text-[#231712] mb-1">
-                          Special Requests / Custom Inscription
+                        <label className="block text-[11px] font-bold text-[#302020] mb-1">
+                          Dietary / Allergy Flags
                         </label>
-                        <textarea
-                          rows={2}
+                        <div className="flex flex-wrap gap-1.5">
+                          {allergyOptions.map((opt) => (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => toggleAllergy(opt)}
+                              className={`text-[10px] px-2 py-1 rounded-lg border transition-all cursor-pointer ${
+                                allergies.includes(opt)
+                                  ? 'bg-[#8E2745] text-white border-[#8E2745]'
+                                  : 'bg-white text-[#806D6A] border-[#3A1F1F]/15'
+                              }`}
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Special Instructions */}
+                      <div>
+                        <label className="block text-[11px] font-bold text-[#302020] mb-1">
+                          Delivery Instructions or Notes (Optional)
+                        </label>
+                        <input
+                          type="text"
                           value={specialInstructions}
                           onChange={(e) => setSpecialInstructions(e.target.value)}
-                          placeholder="e.g. Please fry extra golden, leave on front porch, etc."
-                          className="w-full px-3 py-2 bg-white border border-[#231712]/15 rounded-lg text-xs text-[#231712] focus:outline-none focus:border-[#D99B26]"
+                          placeholder="e.g. Gate code, leave with receptionist, extra napkins..."
+                          className="w-full px-3 py-2 bg-white rounded-xl border border-[#3A1F1F]/15 text-xs text-[#302020]"
                         />
                       </div>
                     </div>
 
-                    {/* Allergy Checkbox */}
-                    <div className="bg-[#FAF6EE] p-3 rounded-xl border border-[#231712]/8">
-                      <div className="flex items-center gap-1.5 mb-2 text-[#231712]">
-                        <AlertTriangle className="w-3.5 h-3.5 text-[#D99B26]" />
-                        <span className="text-xs font-accent font-bold uppercase tracking-wider">
-                          Allergy Check (Select if applicable)
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        {allergyOptions.map(allergy => (
-                          <label key={allergy} className="flex items-center gap-1.5 text-[11px] text-[#4A3E39] cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={allergies.includes(allergy)}
-                              onChange={() => toggleAllergy(allergy)}
-                              className="w-3.5 h-3.5 accent-[#C85A32]"
-                            />
-                            <span>{allergy}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* 50% Deposit Summary Box */}
-                    <div className="bg-white p-3.5 rounded-xl border border-[#231712]/8 space-y-1.5 shadow-xs">
-                      <div className="flex justify-between text-xs text-[#4A3E39]">
-                        <span>Items Subtotal:</span>
-                        <span>${cartTotal.toFixed(2)}</span>
-                      </div>
-                      {orderType === 'Delivery' && (
-                        <div className="flex justify-between text-xs text-[#4A3E39]">
-                          <span>Courier Delivery:</span>
-                          <span>{isFreeDeliveryQualified ? 'FREE ($0.00)' : '+$15.00'}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between text-sm font-serif font-bold text-[#231712] pt-1 border-t border-[#231712]/8">
-                        <span>Grand Total:</span>
-                        <span>${grandTotal.toFixed(2)}</span>
-                      </div>
-                      
-                      {/* Highlighted 50% Deposit */}
-                      <div className="bg-[#FBF2DE] p-2.5 rounded-lg border border-[#D99B26]/30 mt-2">
-                        <div className="flex justify-between items-baseline">
-                          <span className="text-xs font-accent font-bold text-[#231712]">
-                            50% Deposit Due Now:
-                          </span>
-                          <span className="font-serif text-base font-bold text-[#D99B26]">
-                            ${depositNow.toFixed(2)}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-[#7A6C65] mt-0.5">
-                          Remaining balance of ${balanceLater.toFixed(2)} due on {orderType === 'Delivery' ? 'delivery' : 'pickup'}.
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Terms Acceptance */}
-                    <div className="space-y-2 pt-1 text-[11px] text-[#4A3E39]">
-                      <label className="flex items-start gap-2 cursor-pointer">
+                    {/* CONFIRMATION CHECKBOXES */}
+                    <div className="space-y-2 pt-2 border-t border-[#3A1F1F]/10">
+                      <label className="flex items-start gap-2 cursor-pointer text-xs text-[#302020]">
                         <input
                           type="checkbox"
-                          required
-                          checked={agreedToDeposit}
-                          onChange={(e) => setAgreedToDeposit(e.target.checked)}
-                          className="w-4 h-4 mt-0.5 accent-[#C85A32]"
+                          checked={agreedToPaymentOnDelivery}
+                          onChange={(e) => setAgreedToPaymentOnDelivery(e.target.checked)}
+                          className="mt-0.5 w-4 h-4 rounded text-[#D93462] focus:ring-[#D93462]"
                         />
-                        <span>
-                          I understand that a 50% deposit (${depositNow.toFixed(2)}) is required to secure the baking slot.
+                        <span className="font-semibold">
+                          I understand that payment will be collected when my order is delivered or picked up.
                         </span>
                       </label>
 
-                      <label className="flex items-start gap-2 cursor-pointer">
+                      <label className="flex items-start gap-2 cursor-pointer text-xs text-[#806D6A]">
                         <input
                           type="checkbox"
-                          required
                           checked={agreedToTerms}
                           onChange={(e) => setAgreedToTerms(e.target.checked)}
-                          className="w-4 h-4 mt-0.5 accent-[#C85A32]"
+                          className="mt-0.5 w-4 h-4 rounded text-[#D93462] focus:ring-[#D93462]"
                         />
                         <span>
-                          I agree to the 3-day lead time policy and Maseh's Delight terms of service.
+                          I agree to the ordering policies and bakery terms of Maseh’s Delights.
                         </span>
                       </label>
                     </div>
-
                   </form>
                 )}
-
               </div>
 
-              {/* Footer Actions */}
-              <div className="p-4 sm:p-5 bg-white border-t border-[#231712]/8">
-                {!isCheckingOut ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-accent font-semibold uppercase text-[#7A6C65]">
-                        Subtotal ({cartCount} items)
-                      </span>
-                      <span className="font-serif text-xl font-bold text-[#231712]">
-                        ${cartTotal.toFixed(2)}
-                      </span>
+              {/* FOOTER SUMMARY & ACTIONS */}
+              {cart.length > 0 && (
+                <div className="p-4 sm:p-6 bg-white border-t border-[#3A1F1F]/10 space-y-3">
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between text-[#806D6A]">
+                      <span>Subtotal</span>
+                      <span>${cartTotal.toFixed(2)}</span>
                     </div>
-
-                    <button
-                      type="button"
-                      disabled={cart.length === 0}
-                      onClick={() => setIsCheckingOut(true)}
-                      className="w-full btn-primary py-3 text-sm justify-center disabled:opacity-50 group"
-                    >
-                      <span>Proceed to Checkout</span>
-                      <ArrowRight className="w-4 h-4 btn-arrow transition-transform duration-200" />
-                    </button>
+                    <div className="flex justify-between text-[#806D6A]">
+                      <span>Fulfillment ({orderType})</span>
+                      <span>{deliveryFee === 0 ? 'Free' : `$${deliveryFee.toFixed(2)}`}</span>
+                    </div>
+                    <div className="flex justify-between text-base font-bold text-[#302020] pt-1 border-t border-[#3A1F1F]/8">
+                      <span>Total Due on Delivery:</span>
+                      <span className="text-[#8E2745] font-serif">${grandTotal.toFixed(2)}</span>
+                    </div>
                   </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsCheckingOut(false)}
-                      className="btn-secondary text-xs py-3 px-4"
-                    >
-                      Back
-                    </button>
-                    <button
-                      type="submit"
-                      form="checkout-form"
-                      className="flex-1 btn-primary py-3 text-xs sm:text-sm justify-center group"
-                    >
-                      <ShieldCheck className="w-4 h-4" />
-                      <span>Confirm Order (${depositNow.toFixed(2)})</span>
-                    </button>
-                  </div>
-                )}
-              </div>
 
+                  {!isCheckingOut ? (
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => setIsCheckingOut(true)}
+                        className="w-full btn-primary py-3 text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md"
+                      >
+                        <span>Proceed to Order (Pay on Delivery)</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setIsCartOpen(false)}
+                        className="w-full text-center text-xs text-[#806D6A] hover:text-[#302020] py-1"
+                      >
+                        Continue Shopping
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <button
+                        type="submit"
+                        form="checkout-form"
+                        disabled={isSubmitting}
+                        className="w-full btn-primary py-3.5 text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-50"
+                      >
+                        {isSubmitting ? (
+                          <span>Placing Your Order...</span>
+                        ) : (
+                          <>
+                            <ShieldCheck className="w-4 h-4 text-[#F5C84B]" />
+                            <span>Confirm & Place Order (${grandTotal.toFixed(2)})</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsCheckingOut(false)}
+                        className="w-full text-center text-xs text-[#806D6A] hover:text-[#302020] py-1"
+                      >
+                        ← Back to Cart Items
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </motion.div>
           </div>
         </div>

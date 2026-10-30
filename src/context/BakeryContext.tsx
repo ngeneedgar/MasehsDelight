@@ -1,10 +1,36 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Product, CartItem, Order, OrderStatus, ProductSizeOption, CustomBespokeInquiry, BlogPost } from '../types/bakery';
-import { INITIAL_PRODUCTS, INITIAL_ORDERS, INITIAL_BESPOKE_INQUIRIES, INITIAL_BLOG_POSTS } from '../data/initialData';
+import {
+  Product,
+  CartItem,
+  Order,
+  OrderStatus,
+  ProductSizeOption,
+  CustomBespokeInquiry,
+  BlogPost,
+  ContactMessage,
+  ProductCategory
+} from '../types/bakery';
+import {
+  INITIAL_PRODUCTS,
+  INITIAL_ORDERS,
+  INITIAL_BESPOKE_INQUIRIES,
+  INITIAL_BLOG_POSTS
+} from '../data/initialData';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, doc, onSnapshot, setDoc, deleteDoc } from 'firebase/firestore';
 
-export type AppView = 'storefront' | 'checkout' | 'order-confirmation' | 'order-tracking' | 'admin';
+export type AppView = 
+  | 'home'
+  | 'shop'
+  | 'checkout'
+  | 'order-confirmation'
+  | 'order-tracking'
+  | 'about'
+  | 'contact'
+  | 'delivery'
+  | 'policies'
+  | 'admin'
+  | 'storefront'; // alias for home
 
 interface BakeryContextType {
   products: Product[];
@@ -15,13 +41,32 @@ interface BakeryContextType {
   blogPosts: BlogPost[];
   selectedArticle: BlogPost | null;
   setSelectedArticle: (post: BlogPost | null) => void;
+  selectedProduct: Product | null;
+  setSelectedProduct: (product: Product | null) => void;
+  selectedCategory: string;
+  setSelectedCategory: (category: string) => void;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
   activeOrder: Order | null;
   currentView: AppView;
   isCartOpen: boolean;
+  isCustomCakeModalOpen: boolean;
+  setIsCustomCakeModalOpen: (open: boolean) => void;
   isCloudSynced: boolean;
   setCurrentView: (view: AppView) => void;
   setIsCartOpen: (open: boolean) => void;
-  addToCart: (product: Product, size: ProductSizeOption, quantity?: number, specialNotes?: string) => void;
+  addToCart: (
+    product: Product,
+    size: ProductSizeOption,
+    quantity?: number,
+    specialNotes?: string,
+    cakeDetails?: {
+      flavor?: string;
+      cakeMessage?: string;
+      colorTheme?: string;
+      eventDate?: string;
+    }
+  ) => void;
   removeFromCart: (cartItemId: string) => void;
   updateCartQuantity: (cartItemId: string, delta: number) => void;
   clearCart: () => void;
@@ -32,15 +77,20 @@ interface BakeryContextType {
     customerEmail: string;
     orderType: 'Pickup' | 'Delivery';
     deliveryAddress?: string;
+    cityState?: string;
+    zipCode?: string;
     eventDate: string;
+    preferredTime?: string;
     allergies: string[];
     specialInstructions?: string;
     deliveryFee: number;
-  }) => Order;
-  updateOrderStatus: (orderId: string, status: OrderStatus) => void;
-  submitBespokeInquiry: (payload: Omit<CustomBespokeInquiry, 'id' | 'createdAt' | 'status'>) => CustomBespokeInquiry;
+    paymentTermsAgreed: boolean;
+  }) => Promise<Order>;
+  updateOrderStatus: (orderId: string, status: OrderStatus, internalNotes?: string) => void;
+  submitBespokeInquiry: (payload: Omit<CustomBespokeInquiry, 'id' | 'createdAt' | 'status'>) => Promise<CustomBespokeInquiry>;
   approveBespokeInquiry: (inquiryId: string, confirmedPrice?: number, bakerNotes?: string) => Order;
   declineBespokeInquiry: (inquiryId: string, reason?: string) => void;
+  submitContactMessage: (payload: { fullName: string; email: string; phone?: string; subject?: string; message: string }) => Promise<void>;
   updateProduct: (product: Product) => void;
   toggleProductStock: (productId: string) => void;
   addProduct: (product: Product) => void;
@@ -58,11 +108,15 @@ const BakeryContext = createContext<BakeryContextType | undefined>(undefined);
 
 export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isCloudSynced, setIsCloudSynced] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isCustomCakeModalOpen, setIsCustomCakeModalOpen] = useState(false);
 
   // Products
   const [products, setProducts] = useState<Product[]>(() => {
     try {
-      const saved = localStorage.getItem('maseh_products_v3');
+      const saved = localStorage.getItem('maseh_products_v4');
       return saved ? JSON.parse(saved) : INITIAL_PRODUCTS;
     } catch {
       return INITIAL_PRODUCTS;
@@ -72,7 +126,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Blog Posts
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>(() => {
     try {
-      const saved = localStorage.getItem('maseh_posts_v2');
+      const saved = localStorage.getItem('maseh_posts_v3');
       return saved ? JSON.parse(saved) : INITIAL_BLOG_POSTS;
     } catch {
       return INITIAL_BLOG_POSTS;
@@ -84,7 +138,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Orders
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
-      const saved = localStorage.getItem('maseh_orders_v2');
+      const saved = localStorage.getItem('maseh_orders_v4');
       return saved ? JSON.parse(saved) : INITIAL_ORDERS;
     } catch {
       return INITIAL_ORDERS;
@@ -94,7 +148,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Custom Bespoke Event Inquiries
   const [customInquiries, setCustomInquiries] = useState<CustomBespokeInquiry[]>(() => {
     try {
-      const saved = localStorage.getItem('maseh_inquiries_v2');
+      const saved = localStorage.getItem('maseh_inquiries_v4');
       return saved ? JSON.parse(saved) : INITIAL_BESPOKE_INQUIRIES;
     } catch {
       return INITIAL_BESPOKE_INQUIRIES;
@@ -104,7 +158,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Cart & Wishlist
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
-      const saved = localStorage.getItem('maseh_cart');
+      const saved = localStorage.getItem('maseh_cart_v4');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -113,18 +167,18 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [wishlist, setWishlist] = useState<string[]>(() => {
     try {
-      const saved = localStorage.getItem('maseh_wishlist');
-      return saved ? JSON.parse(saved) : ['prod-puff-puff'];
+      const saved = localStorage.getItem('maseh_wishlist_v4');
+      return saved ? JSON.parse(saved) : ['prod-puff-puff-1', 'prod-chin-chin'];
     } catch {
-      return ['prod-puff-puff'];
+      return ['prod-puff-puff-1', 'prod-chin-chin'];
     }
   });
 
   const [activeOrder, setActiveOrder] = useState<Order | null>(() => {
     try {
-      const savedId = localStorage.getItem('maseh_active_order_id');
+      const savedId = localStorage.getItem('maseh_active_order_id_v4');
       if (savedId) {
-        const found = orders.find(o => o.id === savedId);
+        const found = orders.find(o => o.id === savedId || o.orderNumber === savedId);
         return found || orders[0] || null;
       }
       return orders[0] || null;
@@ -133,61 +187,92 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   });
 
-  const checkIsAdmin = () => {
-    if (typeof window === 'undefined') return false;
+  // URL route parsing
+  const checkRoute = (): AppView => {
+    if (typeof window === 'undefined') return 'home';
     const hash = window.location.hash.toLowerCase();
     const path = window.location.pathname.toLowerCase();
     const search = window.location.search.toLowerCase();
-    return hash.includes('admin') || path.includes('/admin') || path.endsWith('admin') || search.includes('admin');
+
+    if (hash.includes('admin') || path.includes('/admin') || search.includes('admin')) {
+      return 'admin';
+    }
+    if (hash.includes('track') || path.includes('/track')) {
+      return 'order-tracking';
+    }
+    if (hash.includes('shop')) {
+      return 'shop';
+    }
+    if (hash.includes('cakes')) {
+      setSelectedCategory('Cakes');
+      return 'shop';
+    }
+    if (hash.includes('pastries')) {
+      setSelectedCategory('African Doughnuts');
+      return 'shop';
+    }
+    if (hash.includes('about')) {
+      return 'about';
+    }
+    if (hash.includes('contact')) {
+      return 'contact';
+    }
+    if (hash.includes('delivery')) {
+      return 'delivery';
+    }
+    if (hash.includes('policies') || hash.includes('terms')) {
+      return 'policies';
+    }
+    if (hash.includes('checkout')) {
+      return 'checkout';
+    }
+    if (hash.includes('confirmation')) {
+      return 'order-confirmation';
+    }
+    return 'home';
   };
 
-  const checkIsTracking = () => {
-    if (typeof window === 'undefined') return false;
-    const hash = window.location.hash.toLowerCase();
-    const path = window.location.pathname.toLowerCase();
-    return hash.includes('track') || path.includes('/track');
-  };
-
-  const [currentView, setCurrentViewState] = useState<AppView>(() => {
-    if (checkIsAdmin()) return 'admin';
-    if (checkIsTracking()) return 'order-tracking';
-    return 'storefront';
-  });
+  const [currentView, setCurrentViewState] = useState<AppView>(() => checkRoute());
 
   const setCurrentView = (view: AppView) => {
-    setCurrentViewState(view);
+    const normalized = view === 'storefront' ? 'home' : view;
+    setCurrentViewState(normalized);
     if (typeof window !== 'undefined') {
-      if (view === 'admin') {
+      if (normalized === 'admin') {
         window.location.hash = 'admin';
-      } else if (view === 'order-tracking') {
+      } else if (normalized === 'order-tracking') {
         window.location.hash = 'track';
-      } else if (view === 'storefront') {
-        if (window.location.hash.includes('admin') || window.location.hash.includes('track')) {
+      } else if (normalized === 'shop') {
+        window.location.hash = 'shop';
+      } else if (normalized === 'about') {
+        window.location.hash = 'about';
+      } else if (normalized === 'contact') {
+        window.location.hash = 'contact';
+      } else if (normalized === 'delivery') {
+        window.location.hash = 'delivery';
+      } else if (normalized === 'policies') {
+        window.location.hash = 'policies';
+      } else if (normalized === 'checkout') {
+        window.location.hash = 'checkout';
+      } else if (normalized === 'order-confirmation') {
+        window.location.hash = 'confirmation';
+      } else {
+        if (window.location.hash) {
           history.pushState(null, '', window.location.pathname);
         }
       }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   useEffect(() => {
     const handleUrlChange = () => {
-      if (checkIsAdmin()) {
-        setCurrentViewState('admin');
-      } else if (checkIsTracking()) {
-        setCurrentViewState('order-tracking');
-      } else {
-        const hash = window.location.hash.toLowerCase();
-        if (!hash || hash === '#' || hash === '#storefront' || hash === '#menu' || hash === '#home') {
-          setCurrentViewState('storefront');
-        }
-      }
+      const detected = checkRoute();
+      setCurrentViewState(detected);
     };
 
     window.addEventListener('hashchange', handleUrlChange);
     window.addEventListener('popstate', handleUrlChange);
-    // Initial verification on mount
-    handleUrlChange();
-
     return () => {
       window.removeEventListener('hashchange', handleUrlChange);
       window.removeEventListener('popstate', handleUrlChange);
@@ -196,11 +281,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const [isCartOpen, setIsCartOpen] = useState(false);
 
-  // ══════════════════════════════════════════════════════════════════
-  // FIRESTORE LIVE REAL-TIME LISTENERS
-  // ══════════════════════════════════════════════════════════════════
+  // Firestore Sync Listeners
   useEffect(() => {
-    // 1. Sync Products
     const unsubProducts = onSnapshot(
       collection(db, 'products'),
       (snapshot) => {
@@ -215,7 +297,6 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     );
 
-    // 2. Sync Posts
     const unsubPosts = onSnapshot(
       collection(db, 'posts'),
       (snapshot) => {
@@ -230,7 +311,6 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     );
 
-    // 3. Sync Orders
     const unsubOrders = onSnapshot(
       collection(db, 'orders'),
       (snapshot) => {
@@ -244,13 +324,12 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     );
 
-    // 4. Sync Inquiries
     const unsubInquiries = onSnapshot(
       collection(db, 'inquiries'),
       (snapshot) => {
         if (!snapshot.empty) {
-          const cloudInqs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomBespokeInquiry));
-          setCustomInquiries(cloudInqs);
+          const cloudInquiries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as CustomBespokeInquiry));
+          setCustomInquiries(cloudInquiries);
         }
       },
       (err) => {
@@ -266,40 +345,48 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   }, []);
 
-  // Sync state to local storage as resilient offline cache
+  // Local storage persistence
   useEffect(() => {
-    localStorage.setItem('maseh_products_v3', JSON.stringify(products));
+    localStorage.setItem('maseh_products_v4', JSON.stringify(products));
   }, [products]);
 
   useEffect(() => {
-    localStorage.setItem('maseh_posts_v2', JSON.stringify(blogPosts));
+    localStorage.setItem('maseh_posts_v3', JSON.stringify(blogPosts));
   }, [blogPosts]);
 
   useEffect(() => {
-    localStorage.setItem('maseh_orders_v2', JSON.stringify(orders));
+    localStorage.setItem('maseh_orders_v4', JSON.stringify(orders));
   }, [orders]);
 
   useEffect(() => {
-    localStorage.setItem('maseh_inquiries_v2', JSON.stringify(customInquiries));
+    localStorage.setItem('maseh_inquiries_v4', JSON.stringify(customInquiries));
   }, [customInquiries]);
 
   useEffect(() => {
-    localStorage.setItem('maseh_cart', JSON.stringify(cart));
+    localStorage.setItem('maseh_cart_v4', JSON.stringify(cart));
   }, [cart]);
 
   useEffect(() => {
-    localStorage.setItem('maseh_wishlist', JSON.stringify(wishlist));
+    localStorage.setItem('maseh_wishlist_v4', JSON.stringify(wishlist));
   }, [wishlist]);
 
   useEffect(() => {
     if (activeOrder) {
-      localStorage.setItem('maseh_active_order_id', activeOrder.id);
+      localStorage.setItem('maseh_active_order_id_v4', activeOrder.id);
     }
   }, [activeOrder]);
 
-  const addToCart = (product: Product, size: ProductSizeOption, quantity = 1, specialNotes = '') => {
+  const addToCart = (
+    product: Product,
+    size: ProductSizeOption,
+    quantity = 1,
+    specialNotes = '',
+    cakeDetails?: { flavor?: string; cakeMessage?: string; colorTheme?: string; eventDate?: string }
+  ) => {
     setCart(prev => {
-      const existingIdx = prev.findIndex(item => item.productId === product.id && item.selectedSize.label === size.label);
+      const existingIdx = prev.findIndex(
+        item => item.productId === product.id && item.selectedSize.label === size.label && !cakeDetails
+      );
       if (existingIdx > -1) {
         const updated = [...prev];
         updated[existingIdx].quantity += quantity;
@@ -313,7 +400,8 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         selectedSize: size,
         quantity,
         imageUrl: product.imageUrl,
-        specialInstructions: specialNotes
+        specialInstructions: specialNotes,
+        cakeDetails
       };
       return [...prev, newItem];
     });
@@ -351,49 +439,67 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const cartTotal = cart.reduce((sum, item) => sum + item.selectedSize.price * item.quantity, 0);
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
-  const createOrder = (payload: {
+  // CREATE ORDER WITH PAYMENT ON DELIVERY
+  const createOrder = async (payload: {
     customerName: string;
     customerPhone: string;
     customerEmail: string;
     orderType: 'Pickup' | 'Delivery';
     deliveryAddress?: string;
+    cityState?: string;
+    zipCode?: string;
     eventDate: string;
+    preferredTime?: string;
     allergies: string[];
     specialInstructions?: string;
     deliveryFee: number;
-  }): Order => {
+    paymentTermsAgreed: boolean;
+  }): Promise<Order> => {
     const subtotal = cartTotal;
     const total = subtotal + payload.deliveryFee;
-    const depositAmount = Number((total * 0.5).toFixed(2));
-    const balanceDue = Number((total - depositAmount).toFixed(2));
+    const orderNumber = `MD-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const newOrder: Order = {
-      id: `MD-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: orderNumber,
+      orderNumber,
       createdAt: new Date().toISOString(),
       customerName: payload.customerName,
       customerPhone: payload.customerPhone,
       customerEmail: payload.customerEmail,
       orderType: payload.orderType,
       deliveryAddress: payload.deliveryAddress,
+      cityState: payload.cityState,
+      zipCode: payload.zipCode,
       eventDate: payload.eventDate,
+      preferredTime: payload.preferredTime || '11:00 AM – 3:00 PM',
       items: [...cart],
       subtotal,
       deliveryFee: payload.deliveryFee,
       total,
-      depositAmount,
-      balanceDue,
-      status: 'Awaiting Confirmation',
+      paymentMethod: 'Payment on Delivery',
+      paymentTermsAgreed: payload.paymentTermsAgreed,
+      status: 'Pending',
       allergies: payload.allergies,
       specialInstructions: payload.specialInstructions
     };
 
+    // Update local state immediately
     setOrders(prev => [newOrder, ...prev]);
     setActiveOrder(newOrder);
     clearCart();
     setIsCartOpen(false);
     setCurrentView('order-confirmation');
 
-    // Async write to Firestore
+    // Attempt REST API post
+    try {
+      fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newOrder)
+      }).catch(() => {});
+    } catch {}
+
+    // Firestore mirror
     setDoc(doc(db, 'orders', newOrder.id), newOrder).catch(err => {
       handleFirestoreError(err, OperationType.WRITE, `orders/${newOrder.id}`);
     });
@@ -401,21 +507,41 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return newOrder;
   };
 
-  const updateOrderStatus = (orderId: string, status: OrderStatus) => {
+  const updateOrderStatus = (orderId: string, status: OrderStatus, internalNotes?: string) => {
     setOrders(prev =>
-      prev.map(ord => (ord.id === orderId ? { ...ord, status } : ord))
+      prev.map(ord => {
+        if (ord.id === orderId || ord.orderNumber === orderId) {
+          return {
+            ...ord,
+            status,
+            internalNotes: internalNotes !== undefined ? internalNotes : ord.internalNotes
+          };
+        }
+        return ord;
+      })
     );
 
-    // Async write to Firestore
-    const target = orders.find(o => o.id === orderId);
+    // Call REST endpoint
+    try {
+      fetch(`/api/admin/orders/${orderId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, internalNotes })
+      }).catch(() => {});
+    } catch {}
+
+    // Firestore update
+    const target = orders.find(o => o.id === orderId || o.orderNumber === orderId);
     if (target) {
-      setDoc(doc(db, 'orders', orderId), { ...target, status }, { merge: true }).catch(err => {
+      setDoc(doc(db, 'orders', target.id), { ...target, status, internalNotes }, { merge: true }).catch(err => {
         handleFirestoreError(err, OperationType.UPDATE, `orders/${orderId}`);
       });
     }
   };
 
-  const submitBespokeInquiry = (payload: Omit<CustomBespokeInquiry, 'id' | 'createdAt' | 'status'>): CustomBespokeInquiry => {
+  const submitBespokeInquiry = async (
+    payload: Omit<CustomBespokeInquiry, 'id' | 'createdAt' | 'status'>
+  ): Promise<CustomBespokeInquiry> => {
     const newInquiry: CustomBespokeInquiry = {
       id: `INQ-${Math.floor(100 + Math.random() * 900)}`,
       createdAt: new Date().toISOString(),
@@ -425,7 +551,14 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     setCustomInquiries(prev => [newInquiry, ...prev]);
 
-    // Async write to Firestore
+    try {
+      fetch('/api/custom-cake-inquiries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newInquiry)
+      }).catch(() => {});
+    } catch {}
+
     setDoc(doc(db, 'inquiries', newInquiry.id), newInquiry).catch(err => {
       handleFirestoreError(err, OperationType.WRITE, `inquiries/${newInquiry.id}`);
     });
@@ -438,24 +571,25 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!target) throw new Error('Inquiry not found');
 
     const finalPrice = confirmedPrice || target.estimatedPrice;
-    const deposit = Number((finalPrice * 0.5).toFixed(2));
-    const balance = Number((finalPrice - deposit).toFixed(2));
+    const orderNumber = `MD-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const createdOrder: Order = {
-      id: `MD-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: orderNumber,
+      orderNumber,
       createdAt: new Date().toISOString(),
       customerName: target.customerName,
       customerPhone: target.customerPhone,
       customerEmail: target.customerEmail,
       orderType: 'Pickup',
       eventDate: target.requestedDate,
+      preferredTime: '11:00 AM',
       items: [
         {
           id: `bespoke-item-${Date.now()}`,
           productId: 'bespoke-celebration-cake',
           productName: `Bespoke Cake: ${target.cakeTiers} (${target.eventType})`,
-          category: 'Fondant Cakes',
-          imageUrl: INITIAL_PRODUCTS.find(p => p.category === 'Fondant Cakes')?.imageUrl,
+          category: 'Custom Cakes',
+          imageUrl: INITIAL_PRODUCTS.find(p => p.category === 'Custom Cakes')?.imageUrl,
           selectedSize: {
             label: target.cakeTiers,
             price: finalPrice,
@@ -468,11 +602,12 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       subtotal: finalPrice,
       deliveryFee: 0,
       total: finalPrice,
-      depositAmount: deposit,
-      balanceDue: balance,
-      status: 'Preparing',
+      paymentMethod: 'Payment on Delivery',
+      paymentTermsAgreed: true,
+      status: 'Confirmed',
       allergies: ['Gluten', 'Eggs', 'Dairy'],
       specialInstructions: `Bespoke Order [${target.id}]: ${target.designNotes}`,
+      internalNotes: bakerNotes,
       isCustomOrder: true,
       customDetails: {
         eventType: target.eventType,
@@ -484,13 +619,11 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     setCustomInquiries(prev =>
-      prev.map(r => (r.id === inquiryId ? { ...r, status: 'Approved' as const, bakerQuotePrice: finalPrice, bakerNotes: bakerNotes || 'Bespoke order approved & converted to production order.' } : r))
+      prev.map(inq => (inq.id === inquiryId ? { ...inq, status: 'Approved', bakerQuotePrice: finalPrice, bakerNotes } : inq))
     );
     setOrders(prev => [createdOrder, ...prev]);
-    setActiveOrder(createdOrder);
 
-    // Sync to Firestore
-    setDoc(doc(db, 'inquiries', inquiryId), { status: 'Approved', bakerQuotePrice: finalPrice }, { merge: true }).catch(() => {});
+    setDoc(doc(db, 'inquiries', inquiryId), { ...target, status: 'Approved', bakerQuotePrice: finalPrice, bakerNotes }, { merge: true }).catch(() => {});
     setDoc(doc(db, 'orders', createdOrder.id), createdOrder).catch(() => {});
 
     return createdOrder;
@@ -498,36 +631,50 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const declineBespokeInquiry = (inquiryId: string, reason?: string) => {
     setCustomInquiries(prev =>
-      prev.map(r => (r.id === inquiryId ? { ...r, status: 'Declined' as const, bakerNotes: reason || 'Capacity reached for this weekend.' } : r))
+      prev.map(inq => (inq.id === inquiryId ? { ...inq, status: 'Declined', bakerNotes: reason } : inq))
     );
-    setDoc(doc(db, 'inquiries', inquiryId), { status: 'Declined', bakerNotes: reason }, { merge: true }).catch(() => {});
+    const target = customInquiries.find(r => r.id === inquiryId);
+    if (target) {
+      setDoc(doc(db, 'inquiries', inquiryId), { ...target, status: 'Declined', bakerNotes: reason }, { merge: true }).catch(() => {});
+    }
   };
 
-  // Product CRUD
+  const submitContactMessage = async (payload: { fullName: string; email: string; phone?: string; subject?: string; message: string }) => {
+    try {
+      await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+    } catch {}
+  };
+
   const updateProduct = (product: Product) => {
     setProducts(prev => prev.map(p => (p.id === product.id ? product : p)));
-    setDoc(doc(db, 'products', product.id), product).catch(err => {
+    setDoc(doc(db, 'products', product.id), product, { merge: true }).catch(err => {
       handleFirestoreError(err, OperationType.UPDATE, `products/${product.id}`);
     });
   };
 
   const toggleProductStock = (productId: string) => {
-    setProducts(prev => {
-      const updated = prev.map(p => (p.id === productId ? { ...p, inStock: !p.inStock, active: !p.active } : p));
-      const target = updated.find(p => p.id === productId);
-      if (target) {
-        setDoc(doc(db, 'products', productId), target).catch(err => {
-          handleFirestoreError(err, OperationType.UPDATE, `products/${productId}`);
-        });
-      }
-      return updated;
-    });
+    setProducts(prev =>
+      prev.map(p => {
+        if (p.id === productId) {
+          const updated = { ...p, inStock: !p.inStock };
+          setDoc(doc(db, 'products', p.id), { inStock: updated.inStock }, { merge: true }).catch(err => {
+            handleFirestoreError(err, OperationType.UPDATE, `products/${p.id}`);
+          });
+          return updated;
+        }
+        return p;
+      })
+    );
   };
 
   const addProduct = (product: Product) => {
     setProducts(prev => [product, ...prev]);
     setDoc(doc(db, 'products', product.id), product).catch(err => {
-      handleFirestoreError(err, OperationType.CREATE, `products/${product.id}`);
+      handleFirestoreError(err, OperationType.WRITE, `products/${product.id}`);
     });
   };
 
@@ -538,17 +685,16 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   };
 
-  // Blog Post CRUD
   const addBlogPost = (post: BlogPost) => {
     setBlogPosts(prev => [post, ...prev]);
     setDoc(doc(db, 'posts', post.id), post).catch(err => {
-      handleFirestoreError(err, OperationType.CREATE, `posts/${post.id}`);
+      handleFirestoreError(err, OperationType.WRITE, `posts/${post.id}`);
     });
   };
 
   const updateBlogPost = (post: BlogPost) => {
     setBlogPosts(prev => prev.map(p => (p.id === post.id ? post : p)));
-    setDoc(doc(db, 'posts', post.id), post).catch(err => {
+    setDoc(doc(db, 'posts', post.id), post, { merge: true }).catch(err => {
       handleFirestoreError(err, OperationType.UPDATE, `posts/${post.id}`);
     });
   };
@@ -561,7 +707,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const setActiveOrderById = (orderId: string) => {
-    const found = orders.find(o => o.id.toUpperCase() === orderId.trim().toUpperCase());
+    const found = orders.find(o => o.id === orderId || o.orderNumber === orderId);
     if (found) {
       setActiveOrder(found);
     }
@@ -569,27 +715,9 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const resetToDemoData = () => {
     setProducts(INITIAL_PRODUCTS);
-    setBlogPosts(INITIAL_BLOG_POSTS);
     setOrders(INITIAL_ORDERS);
     setCustomInquiries(INITIAL_BESPOKE_INQUIRIES);
-    setCart([]);
-    setWishlist(['prod-puff-puff']);
-    setActiveOrder(INITIAL_ORDERS[0]);
-    localStorage.removeItem('maseh_products_v3');
-    localStorage.removeItem('maseh_posts_v2');
-    localStorage.removeItem('maseh_orders_v2');
-    localStorage.removeItem('maseh_inquiries_v2');
-    localStorage.removeItem('maseh_cart');
-    localStorage.removeItem('maseh_wishlist');
-    localStorage.removeItem('maseh_active_order_id');
-
-    // Seed to Firestore
-    INITIAL_PRODUCTS.forEach(p => {
-      setDoc(doc(db, 'products', p.id), p).catch(() => {});
-    });
-    INITIAL_BLOG_POSTS.forEach(b => {
-      setDoc(doc(db, 'posts', b.id), b).catch(() => {});
-    });
+    setBlogPosts(INITIAL_BLOG_POSTS);
   };
 
   return (
@@ -603,9 +731,17 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         blogPosts,
         selectedArticle,
         setSelectedArticle,
+        selectedProduct,
+        setSelectedProduct,
+        selectedCategory,
+        setSelectedCategory,
+        searchQuery,
+        setSearchQuery,
         activeOrder,
         currentView,
         isCartOpen,
+        isCustomCakeModalOpen,
+        setIsCustomCakeModalOpen,
         isCloudSynced,
         setCurrentView,
         setIsCartOpen,
@@ -619,6 +755,7 @@ export const BakeryProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         submitBespokeInquiry,
         approveBespokeInquiry,
         declineBespokeInquiry,
+        submitContactMessage,
         updateProduct,
         toggleProductStock,
         addProduct,

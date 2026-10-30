@@ -1,222 +1,148 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useBakery } from '../context/BakeryContext';
 import { ProductCard } from './ProductCard';
 import { ProductQuickOrderModal } from './ProductQuickOrderModal';
 import { Product } from '../types/bakery';
-import { Search, Heart, RotateCcw, Sparkles } from 'lucide-react';
+import { Search, Heart, Sparkles, SlidersHorizontal, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-const LIVE_KITCHEN_UPDATES = [
-  'Morning batch of Atlantic Fish Rolls ready for local pickup',
-  'Golden nutmeg Puff Puff trays proofing in kitchen for today’s orders',
-  'Crunchy sweet-butter Chin Chin pouches sealed & ready for nationwide shipping',
-  'Custom 3-tier celebration wedding cake currently being iced & decorated'
+const CATEGORIES = [
+  { id: 'All', label: 'All Treats' },
+  { id: 'African Doughnuts', label: 'African Doughnuts & Puff Puff' },
+  { id: 'Snacks', label: 'Chin Chin & Snacks' },
+  { id: 'Savory Pastries', label: 'Fish Rolls & Pies' },
+  { id: 'Cakes', label: 'Celebration Cakes' },
+  { id: 'Custom Cakes', label: 'Custom & Fondant Tiers' },
 ];
 
-export const MenuGrid: React.FC = () => {
-  const { products, wishlist } = useBakery();
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
-  const [searchQuery, setSearchQuery] = useState('');
+export const MenuGrid: React.FC<{ isFullShop?: boolean }> = ({ isFullShop = false }) => {
+  const {
+    products,
+    wishlist,
+    selectedCategory,
+    setSelectedCategory,
+    searchQuery,
+    setSearchQuery
+  } = useBakery();
+
+  const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc'>('featured');
+  const [onlyInStock, setOnlyInStock] = useState(false);
   const [onlyWishlist, setOnlyWishlist] = useState(false);
   const [selectedProductForModal, setSelectedProductForModal] = useState<Product | null>(null);
-  const [tickerIndex, setTickerIndex] = useState(0);
-
-  // Rotate live freshness micro-ticker every 5 seconds
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTickerIndex((prev) => (prev + 1) % LIVE_KITCHEN_UPDATES.length);
-    }, 5000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const categories = [
-    { id: 'ALL', label: 'All Pastries' },
-    { id: 'PUFF PUFF', label: 'Puff Puff' },
-    { id: 'CHIN CHIN', label: 'Chin Chin' },
-    { id: 'SAVORY', label: 'Savory Rolls & Eggs' },
-    { id: 'CAKES', label: 'Celebration Cakes' },
-    { id: 'COMBOS', label: 'Party Boxes' },
-  ];
 
   const filteredProducts = products.filter((p) => {
     if (!p.active) return false;
+    if (onlyInStock && !p.inStock) return false;
     if (onlyWishlist && !wishlist.includes(p.id)) return false;
 
-    if (selectedCategory !== 'ALL') {
-      if (selectedCategory === 'PUFF PUFF' && !p.name.includes('Puff')) return false;
-      if (selectedCategory === 'CHIN CHIN' && !p.name.includes('Chin')) return false;
-      if (selectedCategory === 'SAVORY' && !p.name.includes('Fish') && !p.name.includes('Scotch')) return false;
-      if (selectedCategory === 'CAKES' && p.category !== 'Fondant Cakes') return false;
-      if (selectedCategory === 'COMBOS' && !p.name.includes('Sampler') && !p.name.includes('Peanut')) return false;
+    if (selectedCategory !== 'All') {
+      if (p.category !== selectedCategory) return false;
     }
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchName = p.name.toLowerCase().includes(q);
       const matchDesc = p.description.toLowerCase().includes(q);
+      const matchCategory = p.category.toLowerCase().includes(q);
       const matchFlavor = p.flavorNotes?.some((f) => f.toLowerCase().includes(q));
-      return matchName || matchDesc || matchFlavor;
+      return matchName || matchDesc || matchCategory || matchFlavor;
     }
 
     return true;
+  }).sort((a, b) => {
+    if (sortBy === 'price-asc') return a.minPrice - b.minPrice;
+    if (sortBy === 'price-desc') return b.minPrice - a.minPrice;
+    return (b.featured ? 1 : 0) - (a.featured ? 1 : 0);
   });
 
   return (
-    <section id="menu-section" className="py-12 sm:py-16 space-y-8">
+    <section id="menu-section" className="py-8 sm:py-12 space-y-6">
       
-      {/* ══════════════════════════════════════════════════
-          SECTION HEADER WITH TERRACOTTA WAVY ACCENT LINE
-          ══════════════════════════════════════════════════ */}
+      {/* SECTION HEADER */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2">
-        <div className="space-y-3 max-w-xl">
-          <div className="inline-flex items-center gap-2 text-xs font-accent font-bold tracking-wider uppercase text-[#C85A32]">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Artisan Bakery Menu</span>
+        <div className="space-y-2 max-w-xl">
+          <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#8E2745]">
+            <Sparkles className="w-3.5 h-3.5 text-[#F5C84B]" />
+            <span>{isFullShop ? 'Complete Online Store' : 'Featured Pastries & Cakes'}</span>
           </div>
 
-          <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-[#231712] tracking-tight">
-            Handcrafted Fresh to Order
+          <h2 className="font-serif text-3xl sm:text-4xl font-bold text-[#302020] tracking-tight">
+            {isFullShop ? 'Browse Our Fresh Bakery Catalog' : 'Handcrafted Treats Made Fresh to Order'}
           </h2>
 
-          {/* Thin Hand-Drawn-Style Terracotta Wavy Divider */}
-          <div className="w-28 h-2 text-[#C85A32]">
-            <svg viewBox="0 0 120 10" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-              <path d="M0 5C15 1.5 15 8.5 30 5C45 1.5 45 8.5 60 5C75 1.5 75 8.5 90 5C105 1.5 105 8.5 120 5" stroke="#C85A32" strokeWidth="2.5" strokeLinecap="round" />
-            </svg>
-          </div>
-
-          <p className="text-sm sm:text-base text-[#4A3E39] leading-relaxed">
-            Every batch is slow-proofed, hand-rolled, and fried or baked fresh on the morning of your event. Never pre-made or frozen.
+          <p className="text-sm text-[#806D6A] leading-relaxed">
+            Freshly prepared, authentic African pastries and celebration cakes. Add to your cart and pay upon delivery.
           </p>
         </div>
 
-        {/* ══════════════════════════════════════════════════
-            SLIDING ACTIVE TAB CATEGORY FILTER BAR
-            Framer Motion layoutId="activeCategoryIndicator"
-            ══════════════════════════════════════════════════ */}
-        <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-white rounded-xl border border-[#231712]/8 shadow-xs">
-          {categories.map((cat) => {
-            const isSelected = selectedCategory === cat.id;
-            return (
-              <motion.button
-                key={cat.id}
-                whileHover={{ y: -2 }}
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`relative px-4 py-2 rounded-lg text-xs font-accent font-semibold transition-colors cursor-pointer ${
-                  isSelected
-                    ? 'text-white'
-                    : 'text-[#4A3E39] hover:text-[#C85A32] hover:bg-[#FAF6EE]'
-                }`}
-              >
-                {/* Sliding background pill indicator */}
-                {isSelected && (
-                  <motion.div
-                    layoutId="activeCategoryIndicator"
-                    className="absolute inset-0 bg-[#231712] rounded-lg shadow-sm"
-                    transition={{ type: 'spring', stiffness: 450, damping: 35 }}
-                  />
-                )}
-                <span className="relative z-10">{cat.label}</span>
-              </motion.button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ══════════════════════════════════════════════════
-          LIVE FRESHNESS MICRO-TICKER & SEARCH CONTROLS
-          ══════════════════════════════════════════════════ */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-3.5 sm:p-4 rounded-xl border border-[#231712]/8 shadow-xs">
-        
-        {/* Left: Search Bar */}
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#7A6C65]" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search puff puff, chin chin, cakes..."
-            className="w-full pl-9 pr-8 py-2 bg-[#FAF6EE] rounded-lg border border-[#231712]/10 text-xs text-[#231712] placeholder:text-[#7A6C65] focus:outline-none focus:border-[#D99B26] transition-colors"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#7A6C65] hover:text-[#231712]"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-
-        {/* Center: Live Freshness / Scarcity Micro-Ticker */}
-        <div className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-[#FAF6EE] border border-[#231712]/8 max-w-md overflow-hidden text-xs">
-          <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-          </span>
-          <span className="font-accent font-bold text-[10px] text-emerald-800 uppercase tracking-wider flex-shrink-0">
-            [Baking Live]
-          </span>
-          <AnimatePresence mode="wait">
-            <motion.span
-              key={tickerIndex}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.3 }}
-              className="text-[#4A3E39] truncate font-medium text-[11px]"
-            >
-              {LIVE_KITCHEN_UPDATES[tickerIndex]}
-            </motion.span>
-          </AnimatePresence>
-        </div>
-
-        {/* Right: Items Count & Favorites Filter Button */}
-        <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-          <span className="text-xs text-[#7A6C65] font-medium">
-            Showing {filteredProducts.length} items
-          </span>
-
+        {/* Filter Controls (Search & Sort on Desktop) */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Wishlist quick filter */}
           <button
             onClick={() => setOnlyWishlist(!onlyWishlist)}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-accent font-semibold border transition-all cursor-pointer ${
+            className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition-all cursor-pointer ${
               onlyWishlist
-                ? 'bg-[#F9EBE6] border-[#C85A32] text-[#C85A32]'
-                : 'border-[#231712]/10 text-[#4A3E39] hover:bg-[#FAF6EE] hover:text-[#C85A32]'
+                ? 'bg-[#FFF0F4] border-[#D93462] text-[#D93462]'
+                : 'bg-white border-[#3A1F1F]/15 text-[#302020] hover:border-[#3A1F1F]/30'
             }`}
           >
             <Heart className={`w-3.5 h-3.5 ${onlyWishlist ? 'fill-current' : ''}`} />
-            <span>Favorites ({wishlist.length})</span>
+            <span>Wishlist ({wishlist.length})</span>
           </button>
-        </div>
 
+          {/* Sort selector */}
+          <div className="relative">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="px-3 py-2 bg-white rounded-xl border border-[#3A1F1F]/15 text-xs font-semibold text-[#302020] focus:ring-2 focus:ring-[#D93462] cursor-pointer"
+            >
+              <option value="featured">Sort: Featured First</option>
+              <option value="price-asc">Price: Low to High</option>
+              <option value="price-desc">Price: High to Low</option>
+            </select>
+          </div>
+        </div>
       </div>
 
-      {/* ══════════════════════════════════════════════════
-          3-COLUMN PRODUCT GRID
-          ══════════════════════════════════════════════════ */}
+      {/* CATEGORY TABS */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+        {CATEGORIES.map((cat) => {
+          const isSelected = selectedCategory === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                isSelected
+                  ? 'bg-[#3A1F1F] text-white shadow-sm'
+                  : 'bg-white text-[#302020] border border-[#3A1F1F]/12 hover:bg-[#FFF8F0]'
+              }`}
+            >
+              {cat.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* PRODUCT GRID */}
       {filteredProducts.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-[#231712]/8 p-12 text-center max-w-lg mx-auto shadow-xs">
-          <h3 className="font-serif text-xl font-bold text-[#231712] mb-2">
-            No pastries found in this category
-          </h3>
-          <p className="text-xs text-[#7A6C65] mb-5">
-            Try adjusting your search query or reset filters to explore all our fresh African baked treats.
-          </p>
+        <div className="bg-white rounded-2xl border border-[#3A1F1F]/10 p-12 text-center space-y-3">
+          <p className="font-serif text-lg font-bold text-[#302020]">No treats found matching your criteria</p>
+          <p className="text-xs text-[#806D6A]">Try clearing your search filters or browse all categories.</p>
           <button
             onClick={() => {
-              setSelectedCategory('ALL');
+              setSelectedCategory('All');
               setSearchQuery('');
               setOnlyWishlist(false);
             }}
-            className="btn-secondary text-xs py-2 px-5"
+            className="btn-secondary text-xs py-2 px-4"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Reset Category Filters
+            Clear Filters
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {filteredProducts.map((product) => (
             <ProductCard
               key={product.id}
@@ -227,12 +153,11 @@ export const MenuGrid: React.FC = () => {
         </div>
       )}
 
-      {/* Product Quick View / Order Modal */}
+      {/* Quick Order Modal */}
       <ProductQuickOrderModal
         product={selectedProductForModal}
         onClose={() => setSelectedProductForModal(null)}
       />
-
     </section>
   );
 };

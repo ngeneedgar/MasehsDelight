@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useBakery } from '../context/BakeryContext';
 import { MASEH_ASSETS } from '../data/initialData';
-import { ShoppingBag, Heart, Search, Menu, X, ChevronRight, ArrowRight } from 'lucide-react';
+import { ShoppingBag, Heart, Search, Menu, X, ChevronRight, Phone, ShieldCheck } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 const ANNOUNCEMENTS = [
-  'Free DMV courier delivery on orders over $100',
-  'Authentic West African pastries & custom celebration tiers, baked fresh daily',
-  '3-day advance notice required for all event platters and bespoke cakes'
+  'Freshly baked treats for every celebration',
+  'Order ahead for cakes and custom designs',
+  'Payment on delivery — cash or local transfer when your treats arrive'
 ];
 
 export const Header: React.FC = () => {
@@ -17,13 +17,16 @@ export const Header: React.FC = () => {
     cartCount,
     cartTotal,
     setIsCartOpen,
-    wishlist
+    wishlist,
+    setSelectedCategory,
+    setSearchQuery
   } = useBakery();
 
   const [announcementIndex, setAnnouncementIndex] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
 
-  // Rotating single announcement message
   useEffect(() => {
     const timer = setInterval(() => {
       setAnnouncementIndex((prev) => (prev + 1) % ANNOUNCEMENTS.length);
@@ -31,263 +34,318 @@ export const Header: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const navigateTo = (targetId: string) => {
+  const handleNav = (view: any, category?: string) => {
     setIsMobileMenuOpen(false);
-    if (currentView !== 'storefront') {
-      setCurrentView('storefront');
-      setTimeout(() => {
-        document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
-    } else {
-      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth' });
+    if (category) {
+      setSelectedCategory(category);
+    }
+    setCurrentView(view);
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchInput.trim()) {
+      setSearchQuery(searchInput.trim());
+      setCurrentView('shop');
+      setIsSearchOpen(false);
     }
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-[#FAF6EE]/95 backdrop-blur-md border-b border-[#231712]/8 transition-all">
-      {/* 1. SLIM ROTATING ANNOUNCEMENT BAR (Height ~36px, ONE message at a time) */}
-      <div className="bg-[#231712] text-white h-9 flex items-center justify-center px-4 overflow-hidden text-xs">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={announcementIndex}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.3 }}
-            className="flex items-center gap-2 text-center font-medium text-white/90 truncate max-w-xl"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-[#D99B26] inline-block flex-shrink-0 animate-pulse" />
-            <span>{ANNOUNCEMENTS[announcementIndex]}</span>
-          </motion.div>
-        </AnimatePresence>
+    <header className="sticky top-0 z-40 bg-[#FFF8F0]/95 backdrop-blur-md border-b border-[#3A1F1F]/10 transition-all">
+      {/* 1. SLIM ROTATING ANNOUNCEMENT BAR */}
+      <div className="bg-[#3A1F1F] text-white h-9 flex items-center justify-between px-4 sm:px-6 overflow-hidden text-xs">
+        <div className="hidden sm:flex items-center gap-1.5 text-[#F5C84B] font-semibold text-[11px]">
+          <ShieldCheck className="w-3.5 h-3.5" />
+          <span>Payment on Delivery</span>
+        </div>
+
+        <div className="flex-1 flex justify-center overflow-hidden">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={announcementIndex}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.3 }}
+              className="flex items-center gap-2 text-center font-medium text-white/90 truncate max-w-xl text-[11px] sm:text-xs"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-[#F5C84B] inline-block flex-shrink-0 animate-pulse" />
+              <span>{ANNOUNCEMENTS[announcementIndex]}</span>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        <a
+          href="tel:+12406190313"
+          className="hidden md:flex items-center gap-1 text-white/80 hover:text-[#F5C84B] transition-colors text-[11px] font-medium"
+        >
+          <Phone className="w-3 h-3 text-[#F5C84B]" />
+          <span>(240) 619-0313</span>
+        </a>
       </div>
 
-      {/* 2. MAIN NAVBAR (Generous height with prominent, bold logo) */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[88px] sm:h-[98px] md:h-[104px] flex items-center justify-between gap-4">
+      {/* 2. MAIN NAVBAR */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 sm:h-24 flex items-center justify-between gap-4">
         
-        {/* Left: Brand Logo (Prominent, large & bold) */}
+        {/* Left: Brand Logo */}
         <button
-          onClick={() => {
-            if (currentView !== 'storefront') setCurrentView('storefront');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          className="flex items-center focus:outline-none cursor-pointer flex-shrink-0 group py-1.5"
-          aria-label="Maseh's Delight Home"
+          onClick={() => handleNav('home')}
+          className="flex items-center focus:outline-none cursor-pointer flex-shrink-0 group py-1"
+          aria-label="Maseh's Delights Home"
         >
           <img
             src={MASEH_ASSETS.logoColor}
-            alt="Maseh's Delight"
-            className="h-16 sm:h-20 md:h-24 lg:h-26 w-auto max-w-[280px] sm:max-w-[340px] md:max-w-[380px] object-contain transition-transform duration-200 group-hover:scale-[1.03] drop-shadow-[0_2px_12px_rgba(35,23,18,0.08)]"
+            alt="Maseh's Delights"
+            className="h-14 sm:h-18 md:h-20 w-auto max-w-[260px] sm:max-w-[320px] object-contain transition-transform duration-200 group-hover:scale-[1.02]"
           />
         </button>
 
-        {/* Center: Desktop Navigation Links (All SAME style — simple text links) */}
+        {/* Center: Desktop Navigation Links */}
         <nav className="hidden lg:flex items-center gap-7">
           <button
-            onClick={() => navigateTo('menu-section')}
-            className="text-sm font-medium text-[#4A3E39] hover:text-[#C85A32] transition-colors cursor-pointer"
-          >
-            Bakery Menu
-          </button>
-
-          <button
-            onClick={() => navigateTo('custom-cake-studio')}
-            className="text-sm font-medium text-[#4A3E39] hover:text-[#C85A32] transition-colors cursor-pointer"
-          >
-            Bespoke Cakes
-          </button>
-
-          <button
-            onClick={() => navigateTo('story-section')}
-            className="text-sm font-medium text-[#4A3E39] hover:text-[#C85A32] transition-colors cursor-pointer"
-          >
-            Our Story
-          </button>
-
-          <button
-            onClick={() => navigateTo('how-it-works')}
-            className="text-sm font-medium text-[#4A3E39] hover:text-[#C85A32] transition-colors cursor-pointer"
-          >
-            How It Works
-          </button>
-
-          <button
-            onClick={() => navigateTo('blog-section')}
-            className="text-sm font-medium text-[#4A3E39] hover:text-[#C85A32] transition-colors cursor-pointer"
-          >
-            Journal
-          </button>
-
-          <button
-            onClick={() => setCurrentView('order-tracking')}
-            className={`text-sm font-medium transition-colors cursor-pointer ${
-              currentView === 'order-tracking'
-                ? 'text-[#C85A32] font-semibold'
-                : 'text-[#4A3E39] hover:text-[#C85A32]'
+            onClick={() => handleNav('home')}
+            className={`text-sm font-semibold transition-colors cursor-pointer ${
+              currentView === 'home' ? 'text-[#D93462]' : 'text-[#302020] hover:text-[#8E2745]'
             }`}
           >
-            Track Order
+            Home
+          </button>
+
+          <button
+            onClick={() => handleNav('shop', 'All')}
+            className={`text-sm font-semibold transition-colors cursor-pointer ${
+              currentView === 'shop' ? 'text-[#D93462]' : 'text-[#302020] hover:text-[#8E2745]'
+            }`}
+          >
+            Shop
+          </button>
+
+          <button
+            onClick={() => handleNav('shop', 'Cakes')}
+            className="text-sm font-semibold text-[#302020] hover:text-[#8E2745] transition-colors cursor-pointer"
+          >
+            Cakes
+          </button>
+
+          <button
+            onClick={() => handleNav('shop', 'African Doughnuts')}
+            className="text-sm font-semibold text-[#302020] hover:text-[#8E2745] transition-colors cursor-pointer"
+          >
+            Pastries
+          </button>
+
+          <button
+            onClick={() => handleNav('about')}
+            className={`text-sm font-semibold transition-colors cursor-pointer ${
+              currentView === 'about' ? 'text-[#D93462]' : 'text-[#302020] hover:text-[#8E2745]'
+            }`}
+          >
+            About Us
+          </button>
+
+          <button
+            onClick={() => handleNav('contact')}
+            className={`text-sm font-semibold transition-colors cursor-pointer ${
+              currentView === 'contact' ? 'text-[#D93462]' : 'text-[#302020] hover:text-[#8E2745]'
+            }`}
+          >
+            Contact
           </button>
         </nav>
 
-        {/* Right: Utility Icons & Primary CTA Button */}
-        <div className="flex items-center gap-3 sm:gap-4">
-          
-          {/* Quick Search Anchor */}
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Search Toggle */}
           <button
-            onClick={() => navigateTo('menu-section')}
-            className="p-2 text-[#4A3E39] hover:text-[#C85A32] transition-colors cursor-pointer hidden sm:block"
-            title="Search bakery menu"
-            aria-label="Search"
+            onClick={() => setIsSearchOpen(!isSearchOpen)}
+            className="p-2 sm:p-2.5 rounded-xl hover:bg-[#3A1F1F]/5 text-[#302020] transition-colors cursor-pointer"
+            aria-label="Search pastries and cakes"
           >
-            <Search className="w-4 h-4" />
+            <Search className="w-5 h-5" />
           </button>
 
-          {/* Favorites Heart */}
+          {/* Wishlist Link */}
           <button
-            onClick={() => navigateTo('menu-section')}
-            className="relative p-2 text-[#4A3E39] hover:text-[#C85A32] transition-colors cursor-pointer hidden sm:block"
-            title="Saved favorites"
+            onClick={() => handleNav('shop')}
+            className="relative p-2 sm:p-2.5 rounded-xl hover:bg-[#3A1F1F]/5 text-[#302020] transition-colors cursor-pointer hidden sm:flex"
             aria-label="Wishlist"
           >
-            <Heart className={`w-4 h-4 ${wishlist.length > 0 ? 'text-[#C85A32] fill-[#C85A32]' : ''}`} />
+            <Heart className="w-5 h-5" />
             {wishlist.length > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#C85A32]" />
-            )}
-          </button>
-
-          {/* Cart with count badge */}
-          <button
-            onClick={() => setIsCartOpen(true)}
-            className="relative p-2 text-[#231712] hover:text-[#C85A32] transition-colors cursor-pointer flex items-center gap-1.5"
-            aria-label="Shopping Cart"
-          >
-            <div className="relative">
-              <ShoppingBag className="w-5 h-5" />
-              {cartCount > 0 && (
-                <span className="absolute -top-1.5 -right-2 bg-[#C85A32] text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                  {cartCount}
-                </span>
-              )}
-            </div>
-            {cartCount > 0 && (
-              <span className="hidden md:inline text-xs font-semibold text-[#231712]">
-                ${cartTotal.toFixed(2)}
+              <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[#D93462] text-white text-[10px] font-bold flex items-center justify-center">
+                {wishlist.length}
               </span>
             )}
           </button>
 
-          {/* ONE Accent CTA Button: "Order Now" with arrow hover nudge */}
+          {/* Shopping Cart Button */}
           <button
-            onClick={() => navigateTo('menu-section')}
-            className="btn-primary text-xs sm:text-sm py-2 sm:py-2.5 px-4 sm:px-5 hidden sm:inline-flex group"
+            onClick={() => setIsCartOpen(true)}
+            className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-[#3A1F1F] text-white hover:bg-[#4B2926] transition-all shadow-sm cursor-pointer group"
+            aria-label="Shopping Cart"
           >
-            <span>Order Now</span>
-            <ArrowRight className="w-4 h-4 btn-arrow transition-transform duration-200" />
+            <div className="relative">
+              <ShoppingBag className="w-5 h-5 text-[#F5C84B] transition-transform group-hover:scale-110" />
+              {cartCount > 0 && (
+                <span className="absolute -top-1.5 -right-2 bg-[#D93462] text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                  {cartCount}
+                </span>
+              )}
+            </div>
+            <div className="hidden sm:flex flex-col items-start leading-tight">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-[#F5C84B]">Cart</span>
+              <span className="text-xs font-semibold">${cartTotal.toFixed(2)}</span>
+            </div>
           </button>
 
           {/* Mobile Hamburger Toggle */}
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="lg:hidden p-2 text-[#231712] hover:text-[#C85A32] transition-colors"
+            className="lg:hidden p-2 rounded-xl hover:bg-[#3A1F1F]/5 text-[#302020] transition-colors cursor-pointer ml-1"
             aria-label="Toggle menu"
           >
             {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
-
         </div>
       </div>
 
-      {/* Mobile Slide-down Navigation Drawer */}
+      {/* SEARCH BAR POPDOWN */}
       <AnimatePresence>
-        {isMobileMenuOpen && (
+        {isSearchOpen && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="lg:hidden bg-white border-b border-[#231712]/10 px-6 py-6 space-y-4"
+            className="border-t border-[#3A1F1F]/10 bg-[#FFF8F0] px-4 sm:px-6 py-3"
           >
-            {/* Mobile Brand Identity */}
-            <div className="flex items-center justify-between pb-3 border-b border-[#231712]/8">
-              <img
-                src={MASEH_ASSETS.logoColor}
-                alt="Maseh's Delight"
-                className="h-16 w-auto object-contain"
-              />
-              <span className="text-xs text-[#7A6C65] font-accent font-semibold tracking-wide uppercase">Silver Spring, MD</span>
+            <form onSubmit={handleSearchSubmit} className="max-w-3xl mx-auto flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#806D6A]" />
+                <input
+                  type="text"
+                  placeholder="Search puff puff, chin chin, fish rolls, celebration cakes..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  autoFocus
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border border-[#3A1F1F]/15 text-sm focus:outline-none focus:ring-2 focus:ring-[#D93462] text-[#302020]"
+                />
+              </div>
+              <button
+                type="submit"
+                className="btn-primary text-xs py-2.5 px-4"
+              >
+                Search
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsSearchOpen(false)}
+                className="text-xs text-[#806D6A] hover:text-[#302020] px-2"
+              >
+                Close
+              </button>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MOBILE SLIDE-OUT DRAWER */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="lg:hidden bg-[#FFF8F0] border-b border-[#3A1F1F]/15 px-6 py-6 shadow-xl space-y-4 max-h-[80vh] overflow-y-auto"
+          >
+            <div className="flex flex-col space-y-1">
+              <button
+                onClick={() => handleNav('home')}
+                className="flex items-center justify-between py-3 text-base font-bold text-[#302020] border-b border-[#3A1F1F]/8 text-left"
+              >
+                <span>Home</span>
+                <ChevronRight className="w-4 h-4 text-[#806D6A]" />
+              </button>
+
+              <button
+                onClick={() => handleNav('shop', 'All')}
+                className="flex items-center justify-between py-3 text-base font-bold text-[#302020] border-b border-[#3A1F1F]/8 text-left"
+              >
+                <span>Shop Treats</span>
+                <ChevronRight className="w-4 h-4 text-[#806D6A]" />
+              </button>
+
+              <button
+                onClick={() => handleNav('shop', 'Cakes')}
+                className="flex items-center justify-between py-3 text-base font-bold text-[#302020] border-b border-[#3A1F1F]/8 text-left pl-3"
+              >
+                <span>Celebration & Fondant Cakes</span>
+                <ChevronRight className="w-4 h-4 text-[#806D6A]" />
+              </button>
+
+              <button
+                onClick={() => handleNav('shop', 'African Doughnuts')}
+                className="flex items-center justify-between py-3 text-base font-bold text-[#302020] border-b border-[#3A1F1F]/8 text-left pl-3"
+              >
+                <span>Puff Puff & African Doughnuts</span>
+                <ChevronRight className="w-4 h-4 text-[#806D6A]" />
+              </button>
+
+              <button
+                onClick={() => handleNav('shop', 'Snacks')}
+                className="flex items-center justify-between py-3 text-base font-bold text-[#302020] border-b border-[#3A1F1F]/8 text-left pl-3"
+              >
+                <span>Chin Chin Snack Tubs</span>
+                <ChevronRight className="w-4 h-4 text-[#806D6A]" />
+              </button>
+
+              <button
+                onClick={() => handleNav('shop', 'Savory Pastries')}
+                className="flex items-center justify-between py-3 text-base font-bold text-[#302020] border-b border-[#3A1F1F]/8 text-left pl-3"
+              >
+                <span>Fish Rolls & Meat Pies</span>
+                <ChevronRight className="w-4 h-4 text-[#806D6A]" />
+              </button>
+
+              <button
+                onClick={() => handleNav('about')}
+                className="flex items-center justify-between py-3 text-base font-bold text-[#302020] border-b border-[#3A1F1F]/8 text-left"
+              >
+                <span>About Maseh's Delights</span>
+                <ChevronRight className="w-4 h-4 text-[#806D6A]" />
+              </button>
+
+              <button
+                onClick={() => handleNav('contact')}
+                className="flex items-center justify-between py-3 text-base font-bold text-[#302020] border-b border-[#3A1F1F]/8 text-left"
+              >
+                <span>Contact & Inquiries</span>
+                <ChevronRight className="w-4 h-4 text-[#806D6A]" />
+              </button>
+
+              <button
+                onClick={() => handleNav('delivery')}
+                className="flex items-center justify-between py-3 text-base font-bold text-[#302020] border-b border-[#3A1F1F]/8 text-left"
+              >
+                <span>Delivery & Policies</span>
+                <ChevronRight className="w-4 h-4 text-[#806D6A]" />
+              </button>
+
+              <button
+                onClick={() => handleNav('order-tracking')}
+                className="flex items-center justify-between py-3 text-base font-bold text-[#302020] border-b border-[#3A1F1F]/8 text-left"
+              >
+                <span>Track Order Status</span>
+                <ChevronRight className="w-4 h-4 text-[#806D6A]" />
+              </button>
             </div>
 
-            <div className="flex flex-col space-y-3">
+            <div className="pt-2">
               <button
-                onClick={() => navigateTo('menu-section')}
-                className="text-left py-2 text-base font-medium text-[#231712] flex items-center justify-between"
+                onClick={() => handleNav('admin')}
+                className="w-full text-center py-2.5 rounded-xl border border-[#3A1F1F]/20 text-xs font-semibold text-[#806D6A] hover:text-[#302020] hover:bg-[#3A1F1F]/5 transition-colors cursor-pointer"
               >
-                <span>Bakery Menu</span>
-                <ChevronRight className="w-4 h-4 text-[#7A6C65]" />
-              </button>
-
-              <button
-                onClick={() => navigateTo('custom-cake-studio')}
-                className="text-left py-2 text-base font-medium text-[#231712] flex items-center justify-between"
-              >
-                <span>Bespoke Cakes</span>
-                <ChevronRight className="w-4 h-4 text-[#7A6C65]" />
-              </button>
-
-              <button
-                onClick={() => navigateTo('story-section')}
-                className="text-left py-2 text-base font-medium text-[#231712] flex items-center justify-between"
-              >
-                <span>Our Story & Craft</span>
-                <ChevronRight className="w-4 h-4 text-[#7A6C65]" />
-              </button>
-
-              <button
-                onClick={() => navigateTo('how-it-works')}
-                className="text-left py-2 text-base font-medium text-[#231712] flex items-center justify-between"
-              >
-                <span>How It Works</span>
-                <ChevronRight className="w-4 h-4 text-[#7A6C65]" />
-              </button>
-
-              <button
-                onClick={() => navigateTo('blog-section')}
-                className="text-left py-2 text-base font-medium text-[#231712] flex items-center justify-between"
-              >
-                <span>Bakery Journal</span>
-                <ChevronRight className="w-4 h-4 text-[#7A6C65]" />
-              </button>
-
-              <button
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  setCurrentView('order-tracking');
-                }}
-                className="text-left py-2 text-base font-medium text-[#231712] flex items-center justify-between"
-              >
-                <span>Track Order</span>
-                <ChevronRight className="w-4 h-4 text-[#7A6C65]" />
-              </button>
-
-              <button
-                onClick={() => {
-                  setIsMobileMenuOpen(false);
-                  setCurrentView('admin');
-                }}
-                className="text-left py-2 text-xs font-bold text-[#C85A32] flex items-center justify-between bg-[#C85A32]/10 px-3 py-2 rounded-xl"
-              >
-                <span>Staff Operations Hub</span>
-                <ChevronRight className="w-4 h-4 text-[#C85A32]" />
-              </button>
-            </div>
-
-            <div className="pt-3 border-t border-[#231712]/8">
-              <button
-                onClick={() => navigateTo('menu-section')}
-                className="w-full btn-primary py-3 text-sm justify-center group"
-              >
-                <span>Order Fresh Pastries</span>
-                <ArrowRight className="w-4 h-4 btn-arrow transition-transform duration-200" />
+                🔒 Staff Operations Portal
               </button>
             </div>
           </motion.div>

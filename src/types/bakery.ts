@@ -1,4 +1,10 @@
-export type ProductCategory = 'All' | 'Chewable' | 'Fondant Cakes' | 'Savory Pastries';
+export type ProductCategory = 
+  | 'All' 
+  | 'African Doughnuts' 
+  | 'Snacks' 
+  | 'Savory Pastries' 
+  | 'Cakes' 
+  | 'Custom Cakes';
 
 export interface ProductSizeOption {
   label: string;
@@ -9,8 +15,9 @@ export interface ProductSizeOption {
 
 export interface Product {
   id: string;
+  slug: string;
   name: string;
-  category: 'Chewable' | 'Fondant Cakes' | 'Savory Pastries';
+  category: 'African Doughnuts' | 'Snacks' | 'Savory Pastries' | 'Cakes' | 'Custom Cakes';
   badge: string;
   priceRangeText: string;
   minPrice: number;
@@ -18,12 +25,15 @@ export interface Product {
   sizes: ProductSizeOption[];
   description: string;
   flavorNotes: string[];
+  allergens: string[];
+  preparationNotice: string;
   active: boolean;
   inStock: boolean;
-  imageTheme: 'puffpuff' | 'chinchin' | 'fishroll' | 'fondantcake' | 'scotchegg';
+  featured?: boolean;
   imageUrl: string;
   secondaryImageUrl?: string;
   cardBgColor?: string;
+  isCake?: boolean;
 }
 
 export interface CartItem {
@@ -35,35 +45,55 @@ export interface CartItem {
   quantity: number;
   imageUrl?: string;
   specialInstructions?: string;
+  cakeDetails?: {
+    flavor?: string;
+    cakeMessage?: string;
+    colorTheme?: string;
+    eventDate?: string;
+  };
 }
 
-export type OrderStatus = 'Awaiting Confirmation' | 'Preparing' | 'Ready' | 'Delivered';
+export type OrderStatus = 
+  | 'Pending' 
+  | 'Confirmed' 
+  | 'Preparing' 
+  | 'Ready for pickup' 
+  | 'Out for delivery' 
+  | 'Completed' 
+  | 'Cancelled';
 
 export interface Order {
   id: string;
+  orderNumber: string;
   createdAt: string;
   customerName: string;
   customerPhone: string;
   customerEmail: string;
   orderType: 'Pickup' | 'Delivery';
   deliveryAddress?: string;
-  eventDate: string; // Enforced >= 3 days from today
+  cityState?: string;
+  zipCode?: string;
+  eventDate: string;
+  preferredTime?: string;
   items: CartItem[];
   subtotal: number;
   deliveryFee: number;
-  total: number;
-  depositAmount: number; // 50%
-  balanceDue: number; // 50%
+  total: number; // Total amount due on delivery
+  paymentMethod: 'Payment on Delivery';
+  paymentTermsAgreed: boolean;
   status: OrderStatus;
   allergies: string[];
   specialInstructions?: string;
+  internalNotes?: string;
   isCustomOrder?: boolean;
   customDetails?: {
-    eventType: string;
-    guestCount: number;
-    flavor: string;
-    tiers: string;
-    decorNotes: string;
+    eventType?: string;
+    guestCount?: number;
+    flavor?: string;
+    tiers?: string;
+    cakeMessage?: string;
+    colorTheme?: string;
+    decorNotes?: string;
   };
 }
 
@@ -84,6 +114,17 @@ export interface CustomBespokeInquiry {
   status: 'Pending Review' | 'Approved' | 'Declined';
   bakerQuotePrice?: number;
   bakerNotes?: string;
+}
+
+export interface ContactMessage {
+  id: string;
+  createdAt: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  subject: string;
+  message: string;
+  status: 'Unread' | 'Replied';
 }
 
 export interface BlogPost {

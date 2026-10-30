@@ -7,11 +7,18 @@ import React from 'react';
 import { BakeryProvider, useBakery } from './context/BakeryContext';
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
+import { ProductCategoriesSection } from './components/ProductCategoriesSection';
 import { MenuGrid } from './components/MenuGrid';
-import { BakeryStoryBento } from './components/BakeryStoryBento';
+import { WhyChooseUsSection } from './components/WhyChooseUsSection';
 import { BespokeCakeStudio } from './components/BespokeCakeStudio';
+import { OrderingProcessSection } from './components/OrderingProcessSection';
 import { BakeryTestimonials } from './components/BakeryTestimonials';
+import { EventHelpCTA } from './components/EventHelpCTA';
 import { BakeryBlog } from './components/BakeryBlog';
+import { AboutPage } from './components/AboutPage';
+import { ContactPage } from './components/ContactPage';
+import { DeliveryInfoPage } from './components/DeliveryInfoPage';
+import { TermsPoliciesPage } from './components/TermsPoliciesPage';
 import { CartDrawer } from './components/CartDrawer';
 import { OrderConfirmationModal } from './components/OrderConfirmationModal';
 import { OrderTrackerView } from './components/OrderTrackerView';
@@ -28,56 +35,95 @@ const MainContent: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAF6EE] text-[#231712]">
-      {/* 1 & 2. Slim Announcement Bar and Clean Navigation */}
+    <div className="min-h-screen flex flex-col bg-[#FFF8F0] text-[#302020]">
+      {/* 1. Header with announcement bar & navigation */}
       <Header />
 
       {/* Main Page Content */}
       <div className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 sm:py-4">
         <main className="w-full">
-          {currentView === 'storefront' && (
-            <div className="space-y-4 sm:space-y-6">
-              {/* 3 & 4. Hero and Trust Indicators */}
+          {/* HOME PAGE */}
+          {(currentView === 'home' || currentView === 'storefront') && (
+            <div className="space-y-6 sm:space-y-8">
+              {/* Hero Section */}
               <Hero />
 
-              {/* 5. Bakery Menu & Featured Products with Quick Order Modal */}
-              <MenuGrid />
+              {/* Product Categories Section (Section 5.D) */}
+              <ProductCategoriesSection />
 
-              {/* 6 & 7. About/Story & How It Works */}
-              <BakeryStoryBento />
+              {/* Featured Products Grid (Section 5.E) */}
+              <MenuGrid isFullShop={false} />
 
-              {/* 8. Bespoke Custom Cake Studio */}
+              {/* Why Choose Us Section (Section 5.F) */}
+              <WhyChooseUsSection />
+
+              {/* Custom Cake Section (Section 5.G) */}
               <BespokeCakeStudio />
 
-              {/* 9. Customer Testimonials & Reviews */}
+              {/* Ordering Process (Section 5.H) */}
+              <OrderingProcessSection />
+
+              {/* Customer Testimonials (Section 5.I) */}
               <BakeryTestimonials />
 
-              {/* 10. Bakery Journal / Stories Preview */}
+              {/* WhatsApp & Call CTA (Section 5.J) */}
+              <EventHelpCTA />
+
+              {/* Bakery Heritage Stories */}
               <BakeryBlog />
             </div>
           )}
 
+          {/* SHOP PAGE */}
+          {currentView === 'shop' && (
+            <div className="py-4">
+              <MenuGrid isFullShop={true} />
+            </div>
+          )}
+
+          {/* ABOUT PAGE */}
+          {currentView === 'about' && (
+            <AboutPage />
+          )}
+
+          {/* CONTACT PAGE */}
+          {currentView === 'contact' && (
+            <ContactPage />
+          )}
+
+          {/* DELIVERY INFO PAGE */}
+          {currentView === 'delivery' && (
+            <DeliveryInfoPage />
+          )}
+
+          {/* TERMS & POLICIES PAGE */}
+          {currentView === 'policies' && (
+            <TermsPoliciesPage />
+          )}
+
+          {/* ORDER CONFIRMATION VIEW */}
           {currentView === 'order-confirmation' && (
-            <div className="py-6">
+            <div className="py-4">
               <OrderConfirmationModal />
             </div>
           )}
 
+          {/* ORDER TRACKING VIEW */}
           {currentView === 'order-tracking' && (
-            <div className="py-6">
+            <div className="py-4">
               <OrderTrackerView />
             </div>
           )}
         </main>
       </div>
 
-      {/* Slide-over Cart Drawer and Checkout */}
+      {/* Slide-over Cart Drawer and Checkout with Payment on Delivery */}
       <CartDrawer />
 
       {/* Floating WhatsApp Button */}
       <FloatingWhatsAppButton />
 
-      {/* 11. Footer */}
+      {/* Footer */}
       <Footer />
 
       {/* Mobile Sticky Bottom Navigation */}

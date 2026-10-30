@@ -5,30 +5,58 @@
   --font-sans: 'DM Sans', 'Inter', sans-serif;
   --font-accent: 'Plus Jakarta Sans', sans-serif;
 
-  --color-honey: #D99B26;
-  --color-honey-dark: #C0851B;
+  /* Prompt brand tokens */
+  --color-chocolate: #3A1F1F;
+  --color-dark-brown: #4B2926;
+  --color-burgundy: #8E2745;
+  --color-raspberry: #D93462;
+  --color-pink: #F06A82;
+  --color-cream: #FFF8F0;
+  --color-ivory: #FFFCF8;
+  --color-coral: #F47B68;
+  --color-gold: #F5C84B;
+  --color-orange: #F58A4B;
+  --color-green: #4C9B72;
+  --color-text: #302020;
+  --color-muted-text: #806D6A;
+
+  /* Legacy aliases for backwards compatibility */
+  --color-honey: #F5C84B;
+  --color-honey-dark: #D99B26;
   --color-honey-light: #FBF2DE;
+  --color-terracotta: #F47B68;
+  --color-terracotta-dark: #D93462;
+  --color-terracotta-light: #FFF0EB;
+  --color-cocoa: #3A1F1F;
+  --color-cocoa-light: #4B2926;
+  --color-linen: #FFF8F0;
+  --color-linen-alt: #F7EFE6;
+  --color-body: #302020;
+  --color-muted: #806D6A;
+}
 
-  --color-terracotta: #C85A32;
-  --color-terracotta-dark: #AF4924;
-  --color-terracotta-light: #F9EBE6;
-
-  --color-cocoa: #231712;
-  --color-cocoa-light: #3A2820;
-
-  --color-linen: #FAF6EE;
-  --color-linen-alt: #F3ECE0;
-
-  --color-body: #4A3E39;
-  --color-muted: #7A6C65;
+:root {
+  --chocolate: #3A1F1F;
+  --dark-brown: #4B2926;
+  --burgundy: #8E2745;
+  --raspberry: #D93462;
+  --pink: #F06A82;
+  --cream: #FFF8F0;
+  --ivory: #FFFCF8;
+  --coral: #F47B68;
+  --gold: #F5C84B;
+  --orange: #F58A4B;
+  --green: #4C9B72;
+  --text: #302020;
+  --muted-text: #806D6A;
 }
 
 body {
   font-family: 'DM Sans', sans-serif;
-  background-color: #FAF6EE;
-  background-image: radial-gradient(circle at 10% 15%, rgba(217, 155, 38, 0.03) 0%, transparent 40%),
-    radial-gradient(circle at 90% 80%, rgba(200, 90, 50, 0.03) 0%, transparent 40%);
-  color: #231712;
+  background-color: #FFF8F0;
+  background-image: radial-gradient(circle at 10% 15%, rgba(245, 200, 75, 0.05) 0%, transparent 45%),
+    radial-gradient(circle at 90% 80%, rgba(217, 52, 98, 0.04) 0%, transparent 45%);
+  color: #302020;
   margin: 0;
   padding: 0;
   overflow-x: hidden;
@@ -48,47 +76,45 @@ h4, h5, h6, .font-sans {
 
 /* Subtle West African geometric textile pattern */
 .bg-african-textile {
-  background-image: url("data:image/svg+xml,%3Csvg width='48' height='48' viewBox='0 0 48 48' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23C85A32' fill-opacity='0.045' fill-rule='evenodd'%3E%3Cpath d='M24 0l12 12-12 12L12 12zm0 24l12 12-12 12-12-12zm-12-12L0 24l12 12 12-12zm24 0l-12 12 12 12 12-12z'/%3E%3C/g%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg width='48' height='48' viewBox='0 0 48 48' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%238E2745' fill-opacity='0.035' fill-rule='evenodd'%3E%3Cpath d='M24 0l12 12-12 12L12 12zm0 24l12 12-12 12-12-12zm-12-12L0 24l12 12 12-12zm24 0l-12 12 12 12 12-12z'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 /* Tactile artisan card with warm ambient shadow */
 .artisan-card {
   background-color: #FFFFFF;
-  border-radius: 1rem;
-  border: 1px solid rgba(35, 23, 18, 0.07);
-  box-shadow: 0 10px 30px -10px rgba(35, 23, 18, 0.06), 0 2px 8px -1px rgba(35, 23, 18, 0.03);
+  border-radius: 1.25rem;
+  border: 1px solid rgba(58, 31, 31, 0.08);
+  box-shadow: 0 10px 30px -10px rgba(58, 31, 31, 0.06), 0 2px 8px -1px rgba(58, 31, 31, 0.03);
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease, border-color 0.3s ease;
   will-change: transform, box-shadow;
 }
 .artisan-card:hover {
-  transform: translateY(-6px) scale(1.015);
-  box-shadow: 0 20px 40px -12px rgba(200, 90, 50, 0.12), 0 6px 16px -2px rgba(35, 23, 18, 0.05);
-  border-color: rgba(217, 155, 38, 0.28);
+  transform: translateY(-5px);
+  box-shadow: 0 20px 36px -12px rgba(142, 39, 69, 0.12), 0 6px 16px -2px rgba(58, 31, 31, 0.05);
+  border-color: rgba(245, 200, 75, 0.45);
 }
 
-/* Interactive primary button with sliding terracotta gradient & arrow nudge */
+/* Interactive primary button */
 .btn-primary {
-  background: linear-gradient(90deg, #D99B26 0%, #D99B26 48%, #C85A32 100%);
-  background-size: 210% 100%;
-  background-position: left center;
+  background: linear-gradient(135deg, #D93462 0%, #8E2745 100%);
   color: #FFFFFF;
   font-family: 'DM Sans', sans-serif;
   font-weight: 600;
   padding: 0.75rem 1.5rem;
-  border-radius: 0.5rem;
-  transition: background-position 0.4s ease, transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 4px 14px rgba(217, 155, 38, 0.28);
+  border-radius: 0.75rem;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 14px rgba(217, 52, 98, 0.28);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   cursor: pointer;
-  will-change: transform, background-position;
+  will-change: transform;
 }
 .btn-primary:hover {
-  background-position: right center;
-  box-shadow: 0 6px 18px rgba(200, 90, 50, 0.35);
-  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(142, 39, 69, 0.35);
+  transform: translateY(-2px);
+  filter: brightness(1.04);
 }
 .btn-primary:hover .btn-arrow {
   transform: translateX(4px);
@@ -97,15 +123,39 @@ h4, h5, h6, .font-sans {
   transform: translateY(0);
 }
 
+/* Gold action button */
+.btn-gold {
+  background: linear-gradient(135deg, #F5C84B 0%, #E5B229 100%);
+  color: #3A1F1F;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.75rem;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 14px rgba(245, 200, 75, 0.35);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+.btn-gold:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(245, 200, 75, 0.45);
+}
+.btn-gold:active {
+  transform: translateY(0);
+}
+
 /* Secondary Button */
 .btn-secondary {
   background-color: transparent;
-  color: #231712;
-  border: 1.5px solid rgba(35, 23, 18, 0.18);
+  color: #3A1F1F;
+  border: 1.5px solid rgba(58, 31, 31, 0.2);
   font-family: 'DM Sans', sans-serif;
   font-weight: 600;
   padding: 0.75rem 1.5rem;
-  border-radius: 0.5rem;
+  border-radius: 0.75rem;
   transition: all 0.2s ease;
   display: inline-flex;
   align-items: center;
@@ -114,58 +164,13 @@ h4, h5, h6, .font-sans {
   cursor: pointer;
 }
 .btn-secondary:hover {
-  border-color: #C85A32;
-  color: #C85A32;
-  background-color: rgba(200, 90, 50, 0.04);
+  border-color: #8E2745;
+  color: #8E2745;
+  background-color: rgba(142, 39, 69, 0.05);
   transform: translateY(-1px);
 }
 .btn-secondary:active {
   transform: translateY(0);
-}
-
-/* Sine-wave floating animation for badge */
-@keyframes floatSine {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-8px);
-  }
-}
-
-.animate-float-sine {
-  animation: floatSine 4s ease-in-out infinite;
-  will-change: transform;
-}
-
-/* Slow continuous rotation for circular stamp */
-@keyframes spinSlow {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.animate-spin-slow {
-  animation: spinSlow 24s linear infinite;
-  will-change: transform;
-}
-
-/* Heart burst spark animation */
-@keyframes heartSpark {
-  0% {
-    opacity: 0;
-    transform: scale(0.3) translate(0, 0);
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1) translate(var(--tx), var(--ty));
-  }
 }
 
 /* Custom scrollbar */
@@ -174,23 +179,21 @@ h4, h5, h6, .font-sans {
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #FAF6EE;
+  background: #FFF8F0;
 }
 ::-webkit-scrollbar-thumb {
-  background: #D99B26;
+  background: #E5B229;
   border-radius: 9999px;
-  border: 2px solid #FAF6EE;
+  border: 2px solid #FFF8F0;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #C85A32;
+  background: #D93462;
 }
 
-/* Accessibility: respect user preference for reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .animate-float-sine,
-  .animate-spin-slow,
   .artisan-card,
-  .btn-primary {
+  .btn-primary,
+  .btn-gold {
     animation: none !important;
     transition: none !important;
     transform: none !important;
